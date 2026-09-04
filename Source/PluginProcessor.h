@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LocalAiWorker.h"
+#include "SamplePreviewPlayer.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /** Appends one line to the shared Circat diagnostic log (no-op without CIRCAT_HAS_ABOUT).
@@ -46,6 +47,11 @@ public:
     void setFilter (int mode, float cutoffHz, float resonance) noexcept;
     void setFilterEnvelope (float attack, float decay, float sustain, float release, float amount) noexcept;
     void autoSlice() noexcept;
+    void previewPlay (const juce::File& file) { preview.play (file); }
+    void previewStop() { preview.stop(); }
+    bool isPreviewPlaying() const noexcept { return preview.isPlaying(); }
+    void setPreviewGainDb (float db) noexcept { preview.setGainDb (db); }
+    float getPreviewGainDb() const noexcept { return preview.getGainDb(); }
     bool loadSampleFile (const juce::File& file, juce::String& error);
     bool savePreset (const juce::File& file, juce::String& error);
     bool loadPreset (const juce::File& file, juce::String& error);
@@ -74,6 +80,7 @@ public:
 private:
     ThoughtSampler sampler;
     LocalAiWorker worker;
+    SamplePreviewPlayer preview;
     mutable juce::CriticalSection stateLock;
     juce::String prompt { "Brass, D-minor chord, rising" };
     std::atomic<float> aiDuration { 3.0f }, aiCfg { 6.0f }, ampAttack { 0.005f }, ampDecay { 0.15f }, ampSustain { 0.85f }, ampRelease { 0.25f }, drive { 0.0f }, outputGain { 0.0f }, filterCutoff { 8000.0f }, filterResonance { 0.12f }, filterAttack { 0.005f }, filterDecay { 0.2f }, filterSustain { 0.0f }, filterRelease { 0.2f }, filterAmount { 0.0f };

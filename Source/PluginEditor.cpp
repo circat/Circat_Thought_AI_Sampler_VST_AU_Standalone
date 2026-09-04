@@ -301,9 +301,14 @@ void CircatThoughtEditor::mouseDown (const juce::MouseEvent& e)
 
 void CircatThoughtEditor::openBrowser()
 {
-    if (browser != nullptr) { browser.reset(); return; }
-    browser = std::make_unique<GeneratedBrowser> (LocalAiWorker::generatedDirectory());
-    browser->onClose = [this] { browser.reset(); };
+    if (browser != nullptr) { processor.previewStop(); browser.reset(); return; }
+    browser = std::make_unique<GeneratedBrowser> (LocalAiWorker::generatedDirectory(),
+                                                  processor.getPreviewGainDb());
+    browser->onClose = [this] { processor.previewStop(); browser.reset(); };
+    browser->onPreview = [this] (juce::File f) { processor.previewPlay (f); };
+    browser->onStopPreview = [this] { processor.previewStop(); };
+    browser->onPreviewGainDb = [this] (float db) { processor.setPreviewGainDb (db); };
+    browser->isPreviewPlaying = [this] { return processor.isPreviewPlaying(); };
     browser->onLoad = [this] (juce::File f)
     {
         juce::String error;
@@ -311,6 +316,7 @@ void CircatThoughtEditor::openBrowser()
         {
             start.setValue (processor.getSampleStart(), juce::dontSendNotification);
             end.setValue (processor.getSampleEnd(), juce::dontSendNotification);
+            processor.previewStop();
             browser.reset();
         }
         else

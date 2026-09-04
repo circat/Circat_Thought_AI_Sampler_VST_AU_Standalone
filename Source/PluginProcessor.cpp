@@ -24,11 +24,12 @@ CircatThoughtProcessor::CircatThoughtProcessor()
 void CircatThoughtProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     sampler.prepare (sampleRate, samplesPerBlock);
+    preview.prepare (sampleRate, samplesPerBlock);
 #if CIRCAT_HAS_ABOUT
     circat::Log::beginSession (kPluginLogName, kPluginVersion, *this);
 #endif
 }
-void CircatThoughtProcessor::releaseResources() { sampler.reset(); }
+void CircatThoughtProcessor::releaseResources() { sampler.reset(); preview.releaseResources(); }
 
 bool CircatThoughtProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
@@ -40,6 +41,7 @@ void CircatThoughtProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 {
     juce::ScopedNoDenormals noDenormals;
     sampler.processBlock (buffer, midi);
+    preview.processBlock (buffer); // browser audition, mixed on top
 }
 
 juce::AudioProcessorEditor* CircatThoughtProcessor::createEditor() { return new CircatThoughtEditor (*this); }

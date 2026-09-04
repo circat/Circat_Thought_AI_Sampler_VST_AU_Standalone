@@ -110,7 +110,12 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     end.onValueChange = [this] { processor.setSampleRegion ((float) start.getValue(), (float) end.getValue()); };
     loopMode.addItem ("OFF", 1); loopMode.addItem ("LOOP", 2); loopMode.addItem ("ALTERNATE", 3);
     loopMode.setSelectedId (processor.getLoopMode() + 1, juce::dontSendNotification);
-    loopMode.onChange = [this] { processor.setLoop (loopMode.getSelectedId() - 1, (float) loopStart.getValue(), (float) loopEnd.getValue(), (float) loopFade.getValue()); };
+    loopMode.onChange = [this]
+    {
+        const bool on = loopMode.getSelectedId() > 1;
+        loopStart.setEnabled (on); loopEnd.setEnabled (on); loopFade.setEnabled (on);
+        processor.setLoop (loopMode.getSelectedId() - 1, (float) loopStart.getValue(), (float) loopEnd.getValue(), (float) loopFade.getValue());
+    };
     addAndMakeVisible (loopMode);
     loopFade.setRange (0.0, 0.5, 0.001); loopFade.setValue (processor.getLoopFade(), juce::dontSendNotification);
     loopFade.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag); loopFade.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 54, 18);
@@ -171,6 +176,7 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     filterAttack.onValueChange = updateFilterEnvelope; filterDecay.onValueChange = updateFilterEnvelope; filterSustain.onValueChange = updateFilterEnvelope; filterRelease.onValueChange = updateFilterEnvelope; filterAmount.onValueChange = updateFilterEnvelope;
     for (auto* label : { &filterLabel, &cutoffLabel, &resonanceLabel, &filterAttackLabel, &filterDecayLabel, &filterSustainLabel, &filterReleaseLabel, &filterAmountLabel })
     { label->setJustificationType (juce::Justification::centred); label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
+    { const bool on = loopMode.getSelectedId() > 1; loopStart.setEnabled (on); loopEnd.setEnabled (on); loopFade.setEnabled (on); }
     timerCallback();
     startTimerHz (30);
 }
@@ -249,6 +255,38 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
         }
     }
     else { g.setColour (juce::Colour (0xff858f96)); g.drawFittedText ("GENERATE A SAMPLE", wave, juce::Justification::centred, 1); }
+
+    // Start / end and loop-point markers over the waveform.
+    if (! busy && processor.getSampleForDisplay() != nullptr)
+    {
+        auto markX = [&wave] (float pos01)
+        { return wave.getX() + juce::roundToInt (juce::jlimit (0.0f, 1.0f, pos01) * (float) wave.getWidth()); };
+
+        const int xs = markX (processor.getSampleStart());
+        const int xe = markX (processor.getSampleEnd());
+        g.setColour (juce::Colour (0x88000000));
+        g.fillRect (wave.getX(), wave.getY(), xs - wave.getX(), wave.getHeight());
+        g.fillRect (xe, wave.getY(), wave.getRight() - xe, wave.getHeight());
+        g.setColour (ct::filterArc);
+        g.drawVerticalLine (xs, (float) wave.getY(), (float) wave.getBottom());
+        g.drawVerticalLine (xe, (float) wave.getY(), (float) wave.getBottom());
+        g.setFont (9.0f);
+        g.drawText ("START", xs + 3, wave.getY() + 2, 46, 11, juce::Justification::left, false);
+        g.drawText ("END", xe - 40, wave.getY() + 2, 37, 11, juce::Justification::right, false);
+
+        if (loopMode.getSelectedId() > 1)
+        {
+            const int xls = markX (processor.getLoopStart());
+            const int xle = markX (processor.getLoopEnd());
+            g.setColour (ct::accent.withAlpha (0.12f));
+            g.fillRect (xls, wave.getY(), xle - xls, wave.getHeight());
+            g.setColour (ct::accent);
+            g.drawVerticalLine (xls, (float) wave.getY(), (float) wave.getBottom());
+            g.drawVerticalLine (xle, (float) wave.getY(), (float) wave.getBottom());
+            g.setFont (9.0f);
+            g.drawText ("LOOP", xls + 3, wave.getBottom() - 13, 44, 11, juce::Justification::left, false);
+        }
+    }
 }
 
 void CircatThoughtEditor::mouseDown (const juce::MouseEvent& e)
@@ -299,19 +337,23 @@ void CircatThoughtEditor::resized()
     ai.removeFromTop (8);
     generate.setBounds (ai.removeFromBottom (36).removeFromRight (120)); ai.removeFromBottom (8);
     prompt.setBounds (ai);
-    auto sampleControls = juce::Rectangle<int> (left + width + gutter + 18, top + 250, width * 2 + gutter - 36, 160);
-    startLabel.setBounds (sampleControls.removeFromTop (22).removeFromLeft (62)); start.setBounds (sampleControls.removeFromTop (22)); sampleControls.removeFromTop (8);
-    endLabel.setBounds (sampleControls.removeFromTop (22).removeFromLeft (62)); end.setBounds (sampleControls.removeFromTop (22));
-    sampleControls.removeFromTop (8);
-    loopStartLabel.setBounds (sampleControls.removeFromTop (22).removeFromLeft (62)); loopStart.setBounds (sampleControls.removeFromTop (22));
-    loopEndLabel.setBounds (sampleControls.removeFromTop (22).removeFromLeft (62)); loopEnd.setBounds (sampleControls.removeFromTop (22));
-    sampleControls.removeFromTop (6);
-    loopModeLabel.setBounds (sampleControls.removeFromLeft (50).removeFromTop (22)); loopMode.setBounds (sampleControls.removeFromLeft (115).removeFromTop (24));
-    loopFadeLabel.setBounds (sampleControls.removeFromLeft (62).removeFromTop (20)); loopFade.setBounds (sampleControls.removeFromLeft (70).removeFromTop (70));
-    autoSlice.setBounds (left + width + gutter + 18, top + 430, 110, 28);
-    savePreset.setBounds (left + width + gutter + 138, top + 430, 72, 28);
-    loadPreset.setBounds (left + width + gutter + 218, top + 430, 72, 28);
-    saveSample.setBounds (left + width + gutter + 300, top + 430, 112, 28);
+    auto sc = juce::Rectangle<int> (left + width + gutter + 18, top + 252, width * 2 + gutter - 36, getHeight() - (top + 252) - 24);
+    auto scRow = [&sc] (int h) { auto r = sc.removeFromTop (h); sc.removeFromTop (6); return r; };
+    { auto r = scRow (22); startLabel.setBounds (r.removeFromLeft (72)); start.setBounds (r); }
+    { auto r = scRow (22); endLabel.setBounds (r.removeFromLeft (72)); end.setBounds (r); }
+    sc.removeFromTop (10);
+    { auto r = scRow (26); loopModeLabel.setBounds (r.removeFromLeft (72)); loopMode.setBounds (r.removeFromLeft (170)); }
+    { auto r = scRow (22); loopStartLabel.setBounds (r.removeFromLeft (72)); loopStart.setBounds (r); }
+    { auto r = scRow (22); loopEndLabel.setBounds (r.removeFromLeft (72)); loopEnd.setBounds (r); }
+    { auto r = scRow (58); loopFadeLabel.setBounds (r.removeFromLeft (72).removeFromTop (16)); loopFade.setBounds (r.removeFromLeft (58)); }
+    sc.removeFromTop (10);
+    {
+        auto r = sc.removeFromTop (28);
+        autoSlice.setBounds (r.removeFromLeft (100)); r.removeFromLeft (8);
+        savePreset.setBounds (r.removeFromLeft (64)); r.removeFromLeft (6);
+        loadPreset.setBounds (r.removeFromLeft (64)); r.removeFromLeft (6);
+        saveSample.setBounds (r.removeFromLeft (110));
+    }
     auto sound = juce::Rectangle<int> (left + 3 * (width + gutter) + 16, top + 44, width - 32, 180);
     auto placeKnob = [] (juce::Rectangle<int> cell, juce::Label& label, juce::Slider& slider)
     {

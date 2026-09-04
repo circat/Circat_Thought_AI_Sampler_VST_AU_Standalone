@@ -4,6 +4,34 @@
 #include <cmath>
 #include <limits>
 
+namespace
+{
+    /** Find the nearest rising zero-crossing (sample[i] <= 0 && sample[i+1] > 0) within searchWindow samples.
+        Returns the index of the zero-crossing, or targetSample if none found nearby. */
+    static inline int findNearestZeroCrossing (const juce::AudioBuffer<float>& buffer, int targetSample, int searchWindow = 512)
+    {
+        const int numSamples = buffer.getNumSamples();
+        if (numSamples < 2) return juce::jlimit (0, juce::jmax (0, numSamples - 1), targetSample);
+
+        const float* channelData = buffer.getReadPointer (0);
+        int start = juce::jlimit (0, numSamples - 2, targetSample - searchWindow);
+        int end   = juce::jlimit (0, numSamples - 2, targetSample + searchWindow);
+
+        int bestSample = targetSample;
+        float minDistance = std::numeric_limits<float>::max();
+
+        for (int i = start; i <= end; ++i)
+        {
+            if (channelData[i] <= 0.0f && channelData[i + 1] > 0.0f)
+            {
+                const float dist = (float) std::abs (i - targetSample);
+                if (dist < minDistance) { minDistance = dist; bestSample = i; }
+            }
+        }
+        return bestSample;
+    }
+}
+
 ThoughtSampleData::ThoughtSampleData (const juce::AudioBuffer<float>& source, double rate, int rootNote)
     : audio (source), sampleRate (rate > 0.0 ? rate : 44100.0), rootMidiNote (juce::jlimit (0, 127, rootNote))
 {
@@ -117,15 +145,48 @@ public:
                 const float c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
                 const float c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
                 float value = ((c3 * fraction + c2) * fraction + c1) * fraction + x0;
+
+                // Forward loop (mode 1) with equal-power crossfade.
                 if (loopMode == 1 && loopFadeSamples > 1 && position >= loopEndPosition - loopFadeSamples)
                 {
                     const double loopPosition = loopStartPosition + (position - (loopEndPosition - loopFadeSamples));
                     const int loopIndex = juce::jlimit (0, length - 2, (int) loopPosition);
                     const float loopFraction = (float) (loopPosition - loopIndex);
                     const float loopValue = data[loopIndex] + loopFraction * (data[loopIndex + 1] - data[loopIndex]);
-                    const float blend = (float) ((position - (loopEndPosition - loopFadeSamples)) / loopFadeSamples);
-                    value = value + (loopValue - value) * juce::jlimit (0.0f, 1.0f, blend);
+                    const float t = juce::jlimit (0.0f, 1.0f, (float) ((position - (loopEndPosition - loopFadeSamples)) / loopFadeSamples));
+                    const float gainOut = std::cos (t * juce::MathConstants<float>::halfPi);
+                    const float gainIn  = std::sin (t * juce::MathConstants<float>::halfPi);
+                    value = value * gainOut + loopValue * gainIn;
                 }
+                // Ping-pong loop (mode 2) with equal-power crossfade at reversals.
+                else if (loopMode == 2 && loopFadeSamples > 1)
+                {
+                    // Crossfade when approaching loop end (going forward).
+                    if (direction > 0.0 && position >= loopEndPosition - loopFadeSamples)
+                    {
+                        const double mirroredPos = loopEndPosition - (position - (loopEndPosition - loopFadeSamples));
+                        const int mirrorIndex = juce::jlimit (0, length - 2, (int) mirroredPos);
+                        const float mirrorFraction = (float) (mirroredPos - mirrorIndex);
+                        const float mirrorValue = data[mirrorIndex] + mirrorFraction * (data[mirrorIndex + 1] - data[mirrorIndex]);
+                        const float t = juce::jlimit (0.0f, 1.0f, (float) ((position - (loopEndPosition - loopFadeSamples)) / loopFadeSamples));
+                        const float gainOut = std::cos (t * juce::MathConstants<float>::halfPi);
+                        const float gainIn  = std::sin (t * juce::MathConstants<float>::halfPi);
+                        value = value * gainOut + mirrorValue * gainIn;
+                    }
+                    // Crossfade when approaching loop start (going backward).
+                    else if (direction < 0.0 && position <= loopStartPosition + loopFadeSamples)
+                    {
+                        const double mirroredPos = loopStartPosition + (loopStartPosition + loopFadeSamples - position);
+                        const int mirrorIndex = juce::jlimit (0, length - 2, (int) mirroredPos);
+                        const float mirrorFraction = (float) (mirroredPos - mirrorIndex);
+                        const float mirrorValue = data[mirrorIndex] + mirrorFraction * (data[mirrorIndex + 1] - data[mirrorIndex]);
+                        const float t = juce::jlimit (0.0f, 1.0f, (float) ((loopStartPosition + loopFadeSamples - position) / loopFadeSamples));
+                        const float gainOut = std::cos (t * juce::MathConstants<float>::halfPi);
+                        const float gainIn  = std::sin (t * juce::MathConstants<float>::halfPi);
+                        value = value * gainOut + mirrorValue * gainIn;
+                    }
+                }
+
                 output.addSample (channel, start + i, value * gain * envelope);
             }
             position += increment * direction;
@@ -219,6 +280,26 @@ void ThoughtSampler::setLoop (int mode, float start, float end, float fadeSecond
 {
     start = juce::jlimit (0.0f, 0.99f, start);
     end = juce::jlimit (start + 0.001f, 1.0f, end);
+
+    // Snap loop points to nearest zero-crossing if a sample is loaded.
+    const ThoughtSampleData* sample = currentSample.load (std::memory_order_acquire);
+    if (sample != nullptr && sample->audio.getNumSamples() > 1)
+    {
+        const int numSamples = sample->audio.getNumSamples();
+        const int targetStartSample = (int) (start * (float) (numSamples - 1));
+        const int targetEndSample   = (int) (end * (float) (numSamples - 1));
+
+        const int snappedStartSample = findNearestZeroCrossing (sample->audio, targetStartSample, 512);
+        const int snappedEndSample   = findNearestZeroCrossing (sample->audio, targetEndSample, 512);
+
+        // Clamp snapped values to valid range and convert back to normalized.
+        const int clampedStart = juce::jlimit (0, numSamples - 2, snappedStartSample);
+        const int clampedEnd   = juce::jlimit (clampedStart + 1, numSamples - 1, snappedEndSample);
+
+        start = (float) clampedStart / (float) (numSamples - 1);
+        end   = (float) clampedEnd / (float) (numSamples - 1);
+    }
+
     loopMode.store (juce::jlimit (0, 2, mode), std::memory_order_relaxed);
     loopStart.store (start, std::memory_order_relaxed);
     loopEnd.store (end, std::memory_order_relaxed);

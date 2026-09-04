@@ -41,10 +41,11 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     addAndMakeVisible (promptPreset);
     for (auto* slider : { &aiDuration, &aiSteps, &aiCfg, &aiSeed })
     { slider->setSliderStyle (juce::Slider::LinearBar); slider->setTextBoxStyle (juce::Slider::TextBoxRight, false, 54, 20); slider->setColour (juce::Slider::trackColourId, juce::Colour (0xffd9a557)); addAndMakeVisible (*slider); }
-    aiDuration.setRange (1.0, 6.0, 0.1); aiDuration.setValue (3.0);
-    aiSteps.setRange (4, 250, 1); aiSteps.setValue (14);
-    aiCfg.setRange (1.0, 12.0, 0.1); aiCfg.setValue (6.0);
-    aiSeed.setRange (-1, 2147483646.0, 1); aiSeed.setSkewFactorFromMidPoint (1000.0); aiSeed.setValue (-1);
+    aiDuration.setRange (1.0, 6.0, 0.1); aiDuration.setValue (processor.getAiDuration(), juce::dontSendNotification);
+    aiSteps.setRange (4, 250, 1); aiSteps.setValue (processor.getAiSteps(), juce::dontSendNotification);
+    aiCfg.setRange (1.0, 12.0, 0.1); aiCfg.setValue (processor.getAiCfg(), juce::dontSendNotification);
+    aiSeed.setRange (-1, 2147483646.0, 1); aiSeed.setSkewFactorFromMidPoint (1000.0);
+    aiSeed.setValue (processor.getAiSeed(), juce::dontSendNotification);
     for (auto* label : { &durationLabel, &stepsLabel, &cfgLabel, &seedLabel }) { label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
     generationParameters.setText (
         "ONE-SHOT  ·  3.0 s target  ·  14 steps (pingpong)  ·  CFG 6.0  ·  random seed\n"
@@ -103,10 +104,11 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     loopEnd.setValue (processor.getLoopEnd(), juce::dontSendNotification);
     start.onValueChange = [this] { processor.setSampleRegion ((float) start.getValue(), (float) end.getValue()); };
     end.onValueChange = [this] { processor.setSampleRegion ((float) start.getValue(), (float) end.getValue()); };
-    loopMode.addItem ("OFF", 1); loopMode.addItem ("LOOP", 2); loopMode.addItem ("ALTERNATE", 3); loopMode.setSelectedId (1);
+    loopMode.addItem ("OFF", 1); loopMode.addItem ("LOOP", 2); loopMode.addItem ("ALTERNATE", 3);
+    loopMode.setSelectedId (processor.getLoopMode() + 1, juce::dontSendNotification);
     loopMode.onChange = [this] { processor.setLoop (loopMode.getSelectedId() - 1, (float) loopStart.getValue(), (float) loopEnd.getValue(), (float) loopFade.getValue()); };
     addAndMakeVisible (loopMode);
-    loopFade.setRange (0.0, 0.5, 0.001); loopFade.setValue (0.005);
+    loopFade.setRange (0.0, 0.5, 0.001); loopFade.setValue (processor.getLoopFade(), juce::dontSendNotification);
     loopFade.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag); loopFade.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 54, 18);
     loopFade.setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xffd9a557)); addAndMakeVisible (loopFade);
     const auto updateLoop = [this] { processor.setLoop (loopMode.getSelectedId() - 1, (float) loopStart.getValue(), (float) loopEnd.getValue(), (float) loopFade.getValue()); };
@@ -123,12 +125,12 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
         slider->setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xff9ed6b4));
         addAndMakeVisible (*slider);
     }
-    attack.setRange (0.001, 5.0, 0.001); attack.setValue (0.005);
-    decay.setRange (0.001, 5.0, 0.001); decay.setValue (0.15);
-    sustain.setRange (0.0, 1.0, 0.001); sustain.setValue (0.85);
-    release.setRange (0.001, 10.0, 0.001); release.setValue (0.25);
-    drive.setRange (0.0, 24.0, 0.1); drive.setValue (0.0);
-    outputGain.setRange (-60.0, 12.0, 0.1); outputGain.setValue (0.0);
+    attack.setRange (0.001, 5.0, 0.001); attack.setValue (processor.getAmpAttack(), juce::dontSendNotification);
+    decay.setRange (0.001, 5.0, 0.001); decay.setValue (processor.getAmpDecay(), juce::dontSendNotification);
+    sustain.setRange (0.0, 1.0, 0.001); sustain.setValue (processor.getAmpSustain(), juce::dontSendNotification);
+    release.setRange (0.001, 10.0, 0.001); release.setValue (processor.getAmpRelease(), juce::dontSendNotification);
+    drive.setRange (0.0, 24.0, 0.1); drive.setValue (processor.getDrive(), juce::dontSendNotification);
+    outputGain.setRange (-60.0, 12.0, 0.1); outputGain.setValue (processor.getOutputGain(), juce::dontSendNotification);
     const auto updateEnvelope = [this] { processor.setAmpEnvelope ((float) attack.getValue(), (float) decay.getValue(), (float) sustain.getValue(), (float) release.getValue()); };
     attack.onValueChange = updateEnvelope; decay.onValueChange = updateEnvelope; sustain.onValueChange = updateEnvelope; release.onValueChange = updateEnvelope;
     drive.onValueChange = [this] { processor.setInputDriveDb ((float) drive.getValue()); };
@@ -141,7 +143,8 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
         addAndMakeVisible (*label);
     }
     filterMode.addItem ("BYPASS", 1); filterMode.addItem ("LOW-PASS", 2); filterMode.addItem ("HIGH-PASS", 3); filterMode.addItem ("BAND-PASS", 4);
-    filterMode.setSelectedId (2); filterMode.onChange = [this] { processor.setFilter (filterMode.getSelectedId() - 1, (float) cutoff.getValue(), (float) resonance.getValue()); };
+    filterMode.setSelectedId (processor.getFilterMode() + 1, juce::dontSendNotification);
+    filterMode.onChange = [this] { processor.setFilter (filterMode.getSelectedId() - 1, (float) cutoff.getValue(), (float) resonance.getValue()); };
     addAndMakeVisible (filterMode); addAndMakeVisible (filterLabel);
     for (auto* slider : { &cutoff, &resonance, &filterAttack, &filterDecay, &filterSustain, &filterRelease, &filterAmount })
     {
@@ -150,13 +153,14 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
         slider->setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xffd9a557));
         addAndMakeVisible (*slider);
     }
-    cutoff.setRange (20.0, 20000.0, 1.0); cutoff.setSkewFactorFromMidPoint (1000.0); cutoff.setValue (8000.0);
-    resonance.setRange (0.0, 1.0, 0.01); resonance.setValue (0.12);
-    filterAttack.setRange (0.001, 5.0, 0.001); filterAttack.setValue (0.005);
-    filterDecay.setRange (0.001, 5.0, 0.001); filterDecay.setValue (0.20);
-    filterSustain.setRange (0.0, 1.0, 0.001); filterSustain.setValue (0.0);
-    filterRelease.setRange (0.001, 10.0, 0.001); filterRelease.setValue (0.20);
-    filterAmount.setRange (-6.0, 6.0, 0.01); filterAmount.setValue (0.0);
+    cutoff.setRange (20.0, 20000.0, 1.0); cutoff.setSkewFactorFromMidPoint (1000.0);
+    cutoff.setValue (processor.getFilterCutoff(), juce::dontSendNotification);
+    resonance.setRange (0.0, 1.0, 0.01); resonance.setValue (processor.getFilterResonance(), juce::dontSendNotification);
+    filterAttack.setRange (0.001, 5.0, 0.001); filterAttack.setValue (processor.getFilterAttack(), juce::dontSendNotification);
+    filterDecay.setRange (0.001, 5.0, 0.001); filterDecay.setValue (processor.getFilterDecay(), juce::dontSendNotification);
+    filterSustain.setRange (0.0, 1.0, 0.001); filterSustain.setValue (processor.getFilterSustain(), juce::dontSendNotification);
+    filterRelease.setRange (0.001, 10.0, 0.001); filterRelease.setValue (processor.getFilterRelease(), juce::dontSendNotification);
+    filterAmount.setRange (-6.0, 6.0, 0.01); filterAmount.setValue (processor.getFilterAmount(), juce::dontSendNotification);
     cutoff.onValueChange = [this] { processor.setFilter (filterMode.getSelectedId() - 1, (float) cutoff.getValue(), (float) resonance.getValue()); };
     resonance.onValueChange = cutoff.onValueChange;
     const auto updateFilterEnvelope = [this] { processor.setFilterEnvelope ((float) filterAttack.getValue(), (float) filterDecay.getValue(), (float) filterSustain.getValue(), (float) filterRelease.getValue(), (float) filterAmount.getValue()); };

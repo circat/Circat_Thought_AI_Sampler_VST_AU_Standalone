@@ -23,6 +23,48 @@ void CircatThoughtProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 
 juce::AudioProcessorEditor* CircatThoughtProcessor::createEditor() { return new CircatThoughtEditor (*this); }
 
+void CircatThoughtProcessor::setSampleRegion (float start, float end) noexcept
+{
+    sampler.setRegion (start, end);
+}
+
+void CircatThoughtProcessor::setLoop (int mode, float start, float end, float fadeSeconds) noexcept
+{
+    loopMode.store (mode); loopStart.store (start); loopEnd.store (end); loopFade.store (fadeSeconds);
+    sampler.setLoop (mode, start, end, fadeSeconds);
+}
+
+void CircatThoughtProcessor::setAmpEnvelope (float attack, float decay, float sustain, float release) noexcept
+{
+    ampAttack.store (attack); ampDecay.store (decay); ampSustain.store (sustain); ampRelease.store (release);
+    sampler.setAmpEnvelope (attack, decay, sustain, release);
+}
+
+void CircatThoughtProcessor::setInputDriveDb (float db) noexcept
+{
+    drive.store (db);
+    sampler.setInputDriveDb (db);
+}
+
+void CircatThoughtProcessor::setOutputGainDb (float db) noexcept
+{
+    outputGain.store (db);
+    sampler.setOutputGainDb (db);
+}
+
+void CircatThoughtProcessor::setFilter (int mode, float cutoffHz, float resonance) noexcept
+{
+    filterMode.store (mode); filterCutoff.store (cutoffHz); filterResonance.store (resonance);
+    sampler.setFilter (mode, cutoffHz, resonance);
+}
+
+void CircatThoughtProcessor::setFilterEnvelope (float attack, float decay, float sustain, float release, float amount) noexcept
+{
+    filterAttack.store (attack); filterDecay.store (decay); filterSustain.store (sustain);
+    filterRelease.store (release); filterAmount.store (amount);
+    sampler.setFilterEnvelope (attack, decay, sustain, release, amount);
+}
+
 void CircatThoughtProcessor::generate (const juce::String& newPrompt, float duration, int steps, float cfg, int seed)
 {
     {
@@ -44,6 +86,28 @@ void CircatThoughtProcessor::getStateInformation (juce::MemoryBlock& target)
     state.setProperty ("prompt", getPrompt(), nullptr);
     state.setProperty ("sampleStart", sampler.getRegionStart(), nullptr);
     state.setProperty ("sampleEnd", sampler.getRegionEnd(), nullptr);
+    state.setProperty ("aiDuration", aiDuration.load(), nullptr);
+    state.setProperty ("aiSteps", aiSteps.load(), nullptr);
+    state.setProperty ("aiCfg", aiCfg.load(), nullptr);
+    state.setProperty ("aiSeed", aiSeed.load(), nullptr);
+    state.setProperty ("loopMode", loopMode.load(), nullptr);
+    state.setProperty ("loopStart", loopStart.load(), nullptr);
+    state.setProperty ("loopEnd", loopEnd.load(), nullptr);
+    state.setProperty ("loopFade", loopFade.load(), nullptr);
+    state.setProperty ("ampAttack", ampAttack.load(), nullptr);
+    state.setProperty ("ampDecay", ampDecay.load(), nullptr);
+    state.setProperty ("ampSustain", ampSustain.load(), nullptr);
+    state.setProperty ("ampRelease", ampRelease.load(), nullptr);
+    state.setProperty ("drive", drive.load(), nullptr);
+    state.setProperty ("outputGain", outputGain.load(), nullptr);
+    state.setProperty ("filterMode", filterMode.load(), nullptr);
+    state.setProperty ("filterCutoff", filterCutoff.load(), nullptr);
+    state.setProperty ("filterResonance", filterResonance.load(), nullptr);
+    state.setProperty ("filterAttack", filterAttack.load(), nullptr);
+    state.setProperty ("filterDecay", filterDecay.load(), nullptr);
+    state.setProperty ("filterSustain", filterSustain.load(), nullptr);
+    state.setProperty ("filterRelease", filterRelease.load(), nullptr);
+    state.setProperty ("filterAmount", filterAmount.load(), nullptr);
     if (auto xml = state.createXml()) copyXmlToBinary (*xml, target);
 }
 
@@ -52,10 +116,26 @@ void CircatThoughtProcessor::setStateInformation (const void* data, int size)
     if (auto xml = getXmlFromBinary (data, size))
         if (xml->hasTagName ("CircatThought"))
         {
-            const juce::ScopedLock lock (stateLock);
-            prompt = xml->getStringAttribute ("prompt", prompt).substring (0, 512);
-            sampler.setRegion ((float) xml->getDoubleAttribute ("sampleStart", 0.0),
-                               (float) xml->getDoubleAttribute ("sampleEnd", 1.0));
+            {
+                const juce::ScopedLock lock (stateLock);
+                prompt = xml->getStringAttribute ("prompt", prompt).substring (0, 512);
+            }
+            const auto d = [&xml] (const char* n, double fallback) { return xml->getDoubleAttribute (n, fallback); };
+            const auto i = [&xml] (const char* n, int fallback) { return xml->getIntAttribute (n, fallback); };
+            setSampleRegion ((float) d ("sampleStart", 0.0), (float) d ("sampleEnd", 1.0));
+            aiDuration.store ((float) d ("aiDuration", aiDuration.load()));
+            aiSteps.store (i ("aiSteps", aiSteps.load()));
+            aiCfg.store ((float) d ("aiCfg", aiCfg.load()));
+            aiSeed.store (i ("aiSeed", aiSeed.load()));
+            setLoop (i ("loopMode", 0), (float) d ("loopStart", 0.0), (float) d ("loopEnd", 1.0), (float) d ("loopFade", 0.005));
+            setAmpEnvelope ((float) d ("ampAttack", 0.005), (float) d ("ampDecay", 0.15),
+                            (float) d ("ampSustain", 0.85), (float) d ("ampRelease", 0.25));
+            setInputDriveDb ((float) d ("drive", 0.0));
+            setOutputGainDb ((float) d ("outputGain", 0.0));
+            setFilter (i ("filterMode", 1), (float) d ("filterCutoff", 8000.0), (float) d ("filterResonance", 0.12));
+            setFilterEnvelope ((float) d ("filterAttack", 0.005), (float) d ("filterDecay", 0.20),
+                               (float) d ("filterSustain", 0.0), (float) d ("filterRelease", 0.20),
+                               (float) d ("filterAmount", 0.0));
         }
 }
 

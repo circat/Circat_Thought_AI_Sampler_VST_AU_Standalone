@@ -1,0 +1,35 @@
+﻿MSBuild-Version 18.5.4+cb4e32d21 für .NET Framework
+
+  Checking File Globs
+  Building Custom Rule D:/VSTPluginsDev/Circat Thought/CircatThoughtVSTi/CMakeLists.txt
+  CircatThought_rc_lib.vcxproj -> D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_rc_lib.dir\Release\CircatThought_rc_lib.lib
+  Building Custom Rule D:/VSTPluginsDev/Circat Thought/CircatThoughtVSTi/CMakeLists.txt
+  LocalAiWorker.cpp
+  PluginEditor.cpp
+  PluginProcessor.cpp
+  ThoughtSampler.cpp
+  WulfAD.cpp
+  juce_audio_processors.cpp
+  juce_audio_processors_ara.cpp
+  juce_audio_processors_lv2_libs.cpp
+  juce_gui_extra.cpp
+  juce_gui_basics.cpp
+  juce_graphics.cpp
+  juce_events.cpp
+  juce_core.cpp
+  juce_data_structures.cpp
+  juce_audio_basics.cpp
+  juce_audio_utils.cpp
+  juce_audio_formats.cpp
+  juce_audio_devices.cpp
+  Code wird generiert...
+  CircatThought.vcxproj -> D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_artefacts\Release\Circat Thought_SharedCode.lib
+  Building Custom Rule D:/VSTPluginsDev/Circat Thought/CircatThoughtVSTi/CMakeLists.txt
+Circat Thought_SharedCode.lib(PluginEditor.obj) : error LNK2019: Verweis auf nicht aufgelöstes externes Symbol ""public: void __cdecl CircatThoughtProcessor::setSampleRegion(float,float)" (?setSampleRegion@CircatThoughtProcessor@@QEAAXMM@Z)" in Funktion ""void __cdecl std::invoke<class <lambda_4e680c3053fc67005390f7ccebde66d5> &>(class <lambda_4e680c3053fc67005390f7ccebde66d5> &)" (??$invoke@AEAV<lambda_4e680c3053fc67005390f7ccebde66d5>@@@std@@YAXAEAV<lambda_4e680c3053fc67005390f7ccebde66d5>@@@Z)". [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]
+Circat Thought_SharedCode.lib(PluginEditor.obj) : error LNK2019: Verweis auf nicht aufgelöstes externes Symbol ""public: void __cdecl CircatThoughtProcessor::setLoop(int,float,float,float)" (?setLoop@CircatThoughtProcessor@@QEAAXHMMM@Z)" in Funktion ""void __cdecl std::invoke<class <lambda_45820b55b9e5bb51d01d325c8a804ed3> &>(class <lambda_45820b55b9e5bb51d01d325c8a804ed3> &)" (??$invoke@AEAV<lambda_45820b55b9e5bb51d01d325c8a804ed3>@@@std@@YAXAEAV<lambda_45820b55b9e5bb51d01d325c8a804ed3>@@@Z)". [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]
+Circat Thought_SharedCode.lib(PluginEditor.obj) : error LNK2019: Verweis auf nicht aufgelöstes externes Symbol ""public: void __cdecl CircatThoughtProcessor::setAmpEnvelope(float,float,float,float)" (?setAmpEnvelope@CircatThoughtProcessor@@QEAAXMMMM@Z)" in Funktion ""void __cdecl std::invoke<class <lambda_4a619b4cb8f6dd4c03c6e9d891a1d2e2> &>(class <lambda_4a619b4cb8f6dd4c03c6e9d891a1d2e2> &)" (??$invoke@AEAV<lambda_4a619b4cb8f6dd4c03c6e9d891a1d2e2>@@@std@@YAXAEAV<lambda_4a619b4cb8f6dd4c03c6e9d891a1d2e2>@@@Z)". [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]
+Circat Thought_SharedCode.lib(PluginEditor.obj) : error LNK2019: Verweis auf nicht aufgelöstes externes Symbol ""public: void __cdecl CircatThoughtProcessor::setInputDriveDb(float)" (?setInputDriveDb@CircatThoughtProcessor@@QEAAXM@Z)" in Funktion ""void __cdecl std::invoke<class <lambda_23efa0db35120e446f502f2cc943df84> &>(class <lambda_23efa0db35120e446f502f2cc943df84> &)" (??$invoke@AEAV<lambda_23efa0db35120e446f502f2cc943df84>@@@std@@YAXAEAV<lambda_23efa0db35120e446f502f2cc943df84>@@@Z)". [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]
+Circat Thought_SharedCode.lib(PluginEditor.obj) : error LNK2019: Verweis auf nicht aufgelöstes externes Symbol ""public: void __cdecl CircatThoughtProcessor::setOutputGainDb(float)" (?setOutputGainDb@CircatThoughtProcessor@@QEAAXM@Z)" in Funktion ""void __cdecl std::invoke<class <lambda_0e5e026478cb583dbb52b58207b96e4d> &>(class <lambda_0e5e026478cb583dbb52b58207b96e4d> &)" (??$invoke@AEAV<lambda_0e5e026478cb583dbb52b58207b96e4d>@@@std@@YAXAEAV<lambda_0e5e026478cb583dbb52b58207b96e4d>@@@Z)". [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]
+Circat Thought_SharedCode.lib(PluginEditor.obj) : error LNK2019: Verweis auf nicht aufgelöstes externes Symbol ""public: void __cdecl CircatThoughtProcessor::setFilter(int,float,float)" (?setFilter@CircatThoughtProcessor@@QEAAXHMM@Z)" in Funktion ""void __cdecl std::invoke<class <lambda_ad4a15b6d6859570858a071eedd99e18> &>(class <lambda_ad4a15b6d6859570858a071eedd99e18> &)" (??$invoke@AEAV<lambda_ad4a15b6d6859570858a071eedd99e18>@@@std@@YAXAEAV<lambda_ad4a15b6d6859570858a071eedd99e18>@@@Z)". [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]
+Circat Thought_SharedCode.lib(PluginEditor.obj) : error LNK2019: Verweis auf nicht aufgelöstes externes Symbol ""public: void __cdecl CircatThoughtProcessor::setFilterEnvelope(float,float,float,float,float)" (?setFilterEnvelope@CircatThoughtProcessor@@QEAAXMMMMM@Z)" in Funktion ""void __cdecl std::invoke<class <lambda_c9a331bb5ba82912a43eabca951aa804> &>(class <lambda_c9a331bb5ba82912a43eabca951aa804> &)" (??$invoke@AEAV<lambda_c9a331bb5ba82912a43eabca951aa804>@@@std@@YAXAEAV<lambda_c9a331bb5ba82912a43eabca951aa804>@@@Z)". [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]
+D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_artefacts\Release\Standalone\Circat Thought.exe : fatal error LNK1120: 7 nicht aufgelöste Externe [D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\CircatThought_Standalone.vcxproj]

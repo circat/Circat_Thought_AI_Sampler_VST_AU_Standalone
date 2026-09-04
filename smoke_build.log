@@ -1,0 +1,7 @@
+﻿MSBuild-Version 18.5.4+cb4e32d21 für .NET Framework
+
+  Checking File Globs
+  1>Checking Build System
+  Building Custom Rule D:/VSTPluginsDev/Circat Thought/CircatThoughtVSTi/CMakeLists.txt
+  ThoughtSampler.cpp
+  CircatThoughtSamplerSmoke.vcxproj -> D:\VSTPluginsDev\Circat Thought\CircatThoughtVSTi\build\Release\CircatThoughtSamplerSmoke.exe

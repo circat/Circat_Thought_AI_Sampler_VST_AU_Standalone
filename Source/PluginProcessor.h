@@ -50,6 +50,8 @@ public:
     float getSampleEnd() const noexcept { return sampler.getRegionEnd(); }
     float getLoopStart() const noexcept { return sampler.getLoopStart(); }
     float getLoopEnd() const noexcept { return sampler.getLoopEnd(); }
+    int getLoopMode() const noexcept { return loopMode.load(); }
+    float getLoopFade() const noexcept { return loopFade.load(); }
     const ThoughtSampleData* getSampleForDisplay() const noexcept { return sampler.getSample(); }
     LocalAiWorker::Status getGenerationStatus() const noexcept { return worker.getStatus(); }
     juce::String getGenerationStatusText() const { return worker.getStatusText(); }

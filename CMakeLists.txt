@@ -1,7 +1,7 @@
 # Circat Thought – JUCE Standalone MVP
 cmake_minimum_required(VERSION 3.22)
 
-project(CircatThought VERSION 0.8.2 LANGUAGES CXX)
+project(CircatThought VERSION 0.8.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

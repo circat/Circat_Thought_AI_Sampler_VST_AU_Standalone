@@ -2,6 +2,50 @@
 
 #include <cmath>
 
+namespace
+{
+    // Engraved nameplate text — dark drop + light lift + faint warm face.
+    void drawEngraved (juce::Graphics& g, const juce::String& text, juce::Rectangle<int> area,
+                       juce::Font font, juce::Justification just)
+    {
+        g.setFont (font);
+        g.setColour (juce::Colours::black.withAlpha (0.75f));
+        g.drawText (text, area.translated (0, -1), just, false);
+        g.setColour (juce::Colours::white.withAlpha (0.28f));
+        g.drawText (text, area.translated (0, 2), just, false);
+        g.setColour (juce::Colour (0xffe9dfc4).withAlpha (0.92f));
+        g.drawText (text, area, just, false);
+    }
+
+    // Colour-coded section header: tag chip on the left, a rule that runs to the
+    // section's right edge and fades out. Mirrors the S612 master.
+    void drawSectionHeader (juce::Graphics& g, juce::Rectangle<int> area,
+                            const juce::String& tag, juce::Colour sec)
+    {
+        auto r = area.toFloat().withHeight (20.0f);
+        const float tagW = juce::jmin (r.getWidth() - 20.0f, 14.0f + (float) tag.length() * 7.2f);
+        auto tagR = r.removeFromLeft (tagW);
+        g.setColour (juce::Colours::black.withAlpha (0.40f));
+        g.fillRoundedRectangle (tagR.translated (0.0f, 2.0f), 3.0f);
+        g.setColour (sec.withMultipliedAlpha (0.35f));
+        g.fillRoundedRectangle (tagR.expanded (2.0f), 4.0f);
+        g.setColour (sec);
+        g.fillRoundedRectangle (tagR, 2.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.drawLine (tagR.getX() + 2, tagR.getY() + 1.0f, tagR.getRight() - 2, tagR.getY() + 1.0f, 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.94f));
+        g.setFont (juce::Font (10.0f, juce::Font::bold));
+        g.drawText (tag.toUpperCase(), tagR.toNearestInt(), juce::Justification::centred, false);
+
+        r.removeFromLeft (8.0f);
+        auto rule = r.withSizeKeepingCentre (r.getWidth(), 2.0f);
+        juce::ColourGradient rg (sec.withMultipliedAlpha (0.9f), rule.getX(), rule.getY(),
+                                 sec.withMultipliedAlpha (0.1f), rule.getRight(), rule.getY(), false);
+        g.setGradientFill (rg);
+        g.fillRect (rule);
+    }
+}
+
 CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProcessorEditor (&p), processor (p)
 {
     setSize (1280, 800);
@@ -25,6 +69,8 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     about.setPluginInfo ("CIRCAT THOUGHT", "v0.1.0");
     about.setLogName ("Circat Thought");
     about.attachTo (*this);
+    cornerLogo = juce::Drawable::createFromImageData (CircatAboutData::CMlogo_svg, (size_t) CircatAboutData::CMlogo_svgSize);
+    if (cornerLogo != nullptr) cornerLogo->replaceColour (juce::Colours::black, ct::accent);
 #endif
     status.setJustificationType (juce::Justification::centredLeft);
     status.setColour (juce::Label::textColourId, juce::Colour (0xff9ed6b4));
@@ -187,29 +233,74 @@ CircatThoughtEditor::~CircatThoughtEditor() { setLookAndFeel (nullptr); }
 
 void CircatThoughtEditor::paint (juce::Graphics& g)
 {
-    const auto bounds = getLocalBounds().toFloat();
+    const auto full = getLocalBounds();
     g.fillAll (ct::shell);
-    juce::ColourGradient velvet (ct::velvetTop, 0.0f, 44.0f, ct::velvetBot, 0.0f, bounds.getBottom(), false);
-    g.setGradientFill (velvet); g.fillRect (bounds);
-    g.setColour (ct::accent); g.fillRect (0.0f, 43.0f, bounds.getWidth(), 1.0f);
-    logoHit = { 16, 6, 320, 34 };
-    g.setColour (isMouseOverOrDragging() && logoHit.contains (getMouseXYRelative()) ? ct::accent : ct::textPrimary);
-    g.setFont (juce::Font (20.0f, juce::Font::bold));
-    g.drawText ("CIRCAT THOUGHT", 24, 10, 310, 28, juce::Justification::centredLeft);
-    g.setColour (ct::textLabel); g.setFont (12.0f);
-    g.drawText ("AI SAMPLER  /  STABLE AUDIO OPEN", 340, 14, 320, 20, juce::Justification::centredLeft);
 
-    const int top = 60, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
-    const auto card = [&g] (juce::Rectangle<int> r, const juce::String& title)
+    // ── panel: warm espresso velvet + studio lighting + inner bevel (S612 master)
+    auto panel = full.reduced (8);
     {
-        g.setColour (ct::card.withAlpha (0.92f)); g.fillRoundedRectangle (r.toFloat(), 6.0f);
-        g.setColour (ct::cardBorder); g.drawRoundedRectangle (r.toFloat(), 6.0f, 1.0f);
-        g.setColour (ct::accent); g.setFont (11.0f);
-        g.drawText (title, r.reduced (16).removeFromTop (20), juce::Justification::centredLeft);
+        auto mf = panel.toFloat();
+        juce::ColourGradient vg (juce::Colour (0xff2b2420), mf.getCentreX(), mf.getY() + mf.getHeight() * 0.32f,
+                                 juce::Colour (0xff17110d), mf.getX(), mf.getBottom(), true);
+        g.setGradientFill (vg); g.fillRect (panel);
+
+        juce::ColourGradient key (juce::Colour::fromRGBA (255, 236, 210, 42),
+                                  mf.getX() + mf.getWidth() * 0.16f, mf.getY() + mf.getHeight() * 0.02f,
+                                  juce::Colours::transparentWhite,
+                                  mf.getX() + mf.getWidth() * 0.70f, mf.getBottom(), false);
+        g.setGradientFill (key); g.fillRect (panel);
+
+        juce::ColourGradient hot (juce::Colour::fromRGBA (255, 244, 228, 54),
+                                  mf.getCentreX(), mf.getY() + mf.getHeight() * 0.05f,
+                                  juce::Colours::transparentWhite,
+                                  mf.getCentreX(), mf.getY() + mf.getHeight() * 0.55f, true);
+        g.setGradientFill (hot); g.fillRect (panel);
+
+        juce::ColourGradient vig (juce::Colours::transparentBlack, mf.getCentreX(), mf.getCentreY(),
+                                  juce::Colours::black.withAlpha (0.55f), mf.getX(), mf.getY(), true);
+        vig.addColour (0.45, juce::Colours::transparentBlack);
+        vig.addColour (0.80, juce::Colours::black.withAlpha (0.18f));
+        g.setGradientFill (vig); g.fillRect (panel);
+
+        g.setColour (juce::Colours::white.withAlpha (0.06f));
+        g.drawLine (mf.getX() + 1, mf.getY() + 1, mf.getRight() - 1, mf.getY() + 1, 1.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.drawLine (mf.getX() + 1, mf.getBottom() - 1, mf.getRight() - 1, mf.getBottom() - 1, 1.5f);
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.drawRect (panel, 2);
+    }
+
+    // ── nameplate: engraved, centred on the top edge. S612 uses 26pt -> +10.
+    juce::Font np (juce::Font::getDefaultSansSerifFontName(), 36.0f, juce::Font::bold);
+    np = np.withExtraKerningFactor (0.16f);
+    drawEngraved (g, "CIRCAT THOUGHT", { panel.getX(), panel.getY() + 10, panel.getWidth(), 44 }, np,
+                  juce::Justification::centred);
+    g.setColour (ct::textDim);
+    g.setFont (juce::Font (11.0f).withExtraKerningFactor (0.10f));
+    g.drawText ("AI SAMPLER  //  STABLE AUDIO OPEN",
+                { panel.getX(), panel.getY() + 52, panel.getWidth(), 14 }, juce::Justification::centred, false);
+
+    // ── logo in the bottom-right corner (opens the About tile)
+    logoHit = { getWidth() - 176, getHeight() - 36, 158, 28 };
+#if CIRCAT_HAS_ABOUT
+    if (cornerLogo != nullptr)
+        cornerLogo->drawWithin (g, juce::Rectangle<int> (getWidth() - 66, getHeight() - 34, 44, 20).toFloat(),
+                                juce::RectanglePlacement::centred, 1.0f);
+    g.setColour (isMouseOverOrDragging() && logoHit.contains (getMouseXYRelative()) ? ct::accent : ct::textDim);
+    g.setFont (juce::Font (10.0f).withExtraKerningFactor (0.1f));
+    g.drawText ("CIRCAT // MEDIA", { getWidth() - 176, getHeight() - 34, 104, 20 }, juce::Justification::centredRight, false);
+#endif
+
+    const int top = 84, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
+    const auto card = [&g] (juce::Rectangle<int> r, const juce::String& tag, juce::Colour sec)
+    {
+        g.setColour (juce::Colour (0xff1a140f).withAlpha (0.55f)); g.fillRoundedRectangle (r.toFloat(), 6.0f);
+        g.setColour (juce::Colour (0x1fffffff)); g.drawRoundedRectangle (r.toFloat(), 6.0f, 1.0f);
+        drawSectionHeader (g, r.reduced (14).removeFromTop (22), tag, sec);
     };
-    card ({ left, top, width, getHeight() - top - 24 }, "01 // AI / INPUT");
-    card ({ left + (width + gutter), top, width * 2 + gutter, getHeight() - top - 24 }, "02 // SAMPLE / WAVEFORM");
-    card ({ left + 3 * (width + gutter), top, width, getHeight() - top - 24 }, "03 // AMP / FILTER");
+    card ({ left, top, width, getHeight() - top - 22 }, "AI / INPUT", ct::secInput);
+    card ({ left + (width + gutter), top, width * 2 + gutter, getHeight() - top - 22 }, "SAMPLE / WAVEFORM", ct::secSample);
+    card ({ left + 3 * (width + gutter), top, width, getHeight() - top - 22 }, "AMP / FILTER", ct::secOut);
 
     const auto wave = juce::Rectangle<int> (left + width + gutter + 18, top + 48, width * 2 + gutter - 36, 190);
     g.setColour (juce::Colour (0xff10090c)); g.fillRoundedRectangle (wave.toFloat(), 4.0f);
@@ -344,8 +435,8 @@ void CircatThoughtEditor::openMixer()
 
 void CircatThoughtEditor::resized()
 {
-    const int top = 60, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
-    auto ai = juce::Rectangle<int> (left + 16, top + 44, width - 32, getHeight() - top - 68);
+    const int top = 84, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
+    auto ai = juce::Rectangle<int> (left + 16, top + 40, width - 32, getHeight() - top - 64);
     status.setBounds (ai.removeFromTop (22));
     commandView.setBounds (ai.removeFromTop (22));
     generationProgressBar.setBounds (ai.removeFromTop (8)); ai.removeFromTop (5);

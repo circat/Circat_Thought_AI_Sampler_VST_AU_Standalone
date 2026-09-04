@@ -42,6 +42,11 @@ namespace ct
     inline const juce::Colour cardBorder { juce::Colour::fromRGBA (255, 255, 255, 26) };
     inline const juce::Colour accent     { 0xffd9a557 };
     inline const juce::Colour accentDim  { 0xff9c6a38 };
+    // S612 master section tints (colour-coded headers + trailing rules).
+    inline const juce::Colour secInput   { 0xffb07e28 };
+    inline const juce::Colour secSample  { 0xff1e8c80 };
+    inline const juce::Colour secShape   { 0xff5442a0 };
+    inline const juce::Colour secOut     { 0xff4fa868 };
     inline const juce::Colour textPrimary{ 0xffe8eaed };
     inline const juce::Colour textLabel  { 0xffcbd0d7 };
     inline const juce::Colour textDim    { 0xff9ba1ab };
@@ -183,6 +188,7 @@ private:
     double animPhase = 0.0;
 #if CIRCAT_HAS_ABOUT
     circat::AboutPanel about;
+    std::unique_ptr<juce::Drawable> cornerLogo;
 #endif
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CircatThoughtEditor)
 };

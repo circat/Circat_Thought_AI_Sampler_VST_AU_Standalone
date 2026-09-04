@@ -1,0 +1,33 @@
+# CMake/JUCE build output
+build/
+bin/
+obj/
+cmake-build-*/
+
+# IDE files
+.vs/
+.vscode/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.user
+
+# Generated JUCE binary-data files
+*_BinaryData.cpp
+*_BinaryData.h
+
+# Runtime/generated audio
+*.wav
+*.aif
+*.aiff
+*.vst3
+
+# Python/cache and local agent files
+__pycache__/
+*.pyc
+.agent/
+.agent_logs/
+
+# Downloaded local AI runtime and installation logs
+runtime/
+logs/

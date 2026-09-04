@@ -53,8 +53,8 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     for (auto* label : { &durationLabel, &stepsLabel, &cfgLabel, &seedLabel }) { label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
     generationParameters.setText (
         "ONE-SHOT  ·  3.0 s target  ·  14 steps (pingpong)  ·  CFG 6.0  ·  random seed\n"
-        "Lyrics: [hit] [silence]  ·  auto-slice: strongest hit, max. 2.5 s\n"
-        "Auto tags: solo instrument · one isolated event · no loop · dry mix · zero reverb · direct input · mono compatible · no drums",
+        "Auto-slice keeps the strongest hit, max 2.5 s.\n"
+        "Negative conditioning removes drums / rhythm / melody / vocals / reverb — no need to type it.",
         juce::dontSendNotification);
     generationParameters.setJustificationType (juce::Justification::centredLeft);
     generationParameters.setColour (juce::Label::textColourId, juce::Colour (0xff858f96));

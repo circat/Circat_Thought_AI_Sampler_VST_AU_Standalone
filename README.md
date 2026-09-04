@@ -51,8 +51,16 @@ there is no separate load step. Only one bridge uses port 8585.
 
 If `uv` is missing: `winget install --id Astral-sh.uv --exact`.
 
-Faster, higher-quality generation (optional): set `CIRCAT_COMPILE=1` before
-starting the bridge to enable `torch.compile` (slower first run, faster after).
+### Bridge environment variables (optional)
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `CIRCAT_SAO_MODEL` | `full` | `small` loads **Stable Audio Open small** (~340 M, ~4 GB VRAM, a few steps, much faster, slightly lower fidelity). |
+| `CIRCAT_COMPILE` | off | `1` enables `torch.compile` (slower first run, faster after). |
+| `CIRCAT_BRIDGE_IDLE_TIMEOUT` | `150` | Seconds without any plugin request before the bridge unloads the model and exits, so it never lingers after the DAW closes. |
+
+The bridge exits on its own once every plugin instance is gone; nothing is left
+running or holding VRAM.
 
 ## macOS (Apple Silicon / CPU)
 

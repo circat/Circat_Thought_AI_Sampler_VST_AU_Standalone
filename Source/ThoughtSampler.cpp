@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 ThoughtSampleData::ThoughtSampleData (const juce::AudioBuffer<float>& source, double rate, int rootNote)
     : audio (source), sampleRate (rate > 0.0 ? rate : 44100.0), rootMidiNote (juce::jlimit (0, 127, rootNote))
@@ -65,6 +66,13 @@ public:
 
     bool isActive() const noexcept { return active; }
 
+    // Lower = better candidate to steal. Releasing voices and quiet voices go first.
+    float stealPriority() const noexcept
+    {
+        if (! active) return -1.0f;
+        return stage == 3 ? envelope * 0.25f : envelope;
+    }
+
     void render (juce::AudioBuffer<float>& output, int start, int count) noexcept
     {
         if (! active || sample == nullptr || count <= 0)
@@ -122,7 +130,16 @@ public:
             {
                 const int sourceChannel = std::min (channel, sourceChannels - 1);
                 const auto* data = sample->audio.getReadPointer (sourceChannel);
-                float value = data[index] + fraction * (data[index + 1] - data[index]);
+                // 4-point Catmull-Rom / Hermite interpolation. Much less aliasing
+                // than linear when a note is transposed up.
+                const float xm1 = data[index > 0 ? index - 1 : 0];
+                const float x0  = data[index];
+                const float x1  = data[index + 1];
+                const float x2  = data[index + 2 < length ? index + 2 : length - 1];
+                const float c1 = 0.5f * (x1 - xm1);
+                const float c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+                const float c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
+                float value = ((c3 * fraction + c2) * fraction + c1) * fraction + x0;
                 if (loopMode == 1 && loopFadeSamples > 1 && position >= loopEndPosition - loopFadeSamples)
                 {
                     const double loopPosition = loopStartPosition + (position - (loopEndPosition - loopFadeSamples));
@@ -268,7 +285,14 @@ void ThoughtSampler::processBlock (juce::AudioBuffer<float>& output, const juce:
             for (auto& voice : voices)
                 if (! voice->isActive()) { selected = voice.get(); break; }
             if (selected == nullptr)
-                selected = voices.front().get();
+            {
+                float lowest = std::numeric_limits<float>::max();
+                for (auto& voice : voices)
+                {
+                    const float priority = voice->stealPriority();
+                    if (priority < lowest) { lowest = priority; selected = voice.get(); }
+                }
+            }
             selected->noteOn (message.getNoteNumber(), message.getFloatVelocity(), getSample(), sampleRate, getPitchTuning(),
                               getRegionStart(), getRegionEnd(), ampAttack.load(), ampDecay.load(), ampSustain.load(), ampRelease.load(),
                               filterMode.load(), filterCutoff.load(), filterResonance.load(), filterAttack.load(), filterDecay.load(),

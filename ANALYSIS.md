@@ -86,6 +86,15 @@ Stand: 2026-09-04. Basis: `Source/`, `backend/`, `CMakeLists.txt`, `HANDOFF.md`.
 - 7 fehlende Processor-Setter implementiert; volle State-Persistenz.
 - README: Speicherbedarf, Modellgröße, Referenz-Testsystem.
 
+## 6. Erledigt in Sitzung 3 (2026-09-04)
+
+- **SAO small** als Alt-Modell: `CIRCAT_SAO_MODEL=small`. `/health` meldet `model`/`model_id`.
+- **Orphan-Bridge**: Idle-Watchdog im Bridge-Prozess — nach `CIRCAT_BRIDGE_IDLE_TIMEOUT` (150 s) ohne Client-Request wird Modell entladen + Prozess beendet. Zusätzlich `/v1/shutdown`. Kein Cross-Process-Refcount nötig; Plugin pingt `/health` solange offen.
+- **Voice-Stealing**: statt `voices.front()` jetzt Voice mit niedrigster `stealPriority()` (Release-Voices + leise Voices zuerst).
+- **Hermite-Interpolation** (4-Punkt Catmull-Rom) im Voice-Playback statt linear → weniger Aliasing beim Hochpitchen.
+- **Negative Conditioning** im Backend (`negative_conditioning`); doppelter positiver Prompt-Anhang entfernt — Prompt geht unverändert durch.
+- **GitHub Actions** (`.github/workflows/build.yml`): configure + Smoke + Standalone + VST3 + `pluginval --strictness-level 5` auf Windows.
+
 ---
 
 ## 4. Beobachtungen zur UI (nach Angleichung)

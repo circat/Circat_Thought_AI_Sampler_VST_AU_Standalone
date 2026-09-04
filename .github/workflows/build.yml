@@ -1,0 +1,61 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CMake FetchContent (JUCE)
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ runner.os }}-juce709-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_BUILD_TYPE=Release -DCIRCAT_BUILD_VST3=ON
+
+      - name: Build smoke test
+        run: cmake --build build --config Release --target CircatThoughtSamplerSmoke
+
+      - name: Run smoke test
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build -Recurse -Filter CircatThoughtSamplerSmoke.exe | Select-Object -First 1
+          if (-not $exe) { throw "smoke exe not found" }
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw "smoke test failed ($LASTEXITCODE)" }
+
+      - name: Build Standalone + VST3
+        run: |
+          cmake --build build --config Release --target CircatThought_Standalone
+          cmake --build build --config Release --target CircatThought_VST3
+
+      - name: pluginval
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile pluginval.zip
+          Expand-Archive pluginval.zip -DestinationPath pluginval -Force
+          $vst3 = Get-ChildItem build -Recurse -Filter "Circat Thought.vst3" | Select-Object -First 1
+          if (-not $vst3) { throw "VST3 not found" }
+          & ".\pluginval\pluginval.exe" --strictness-level 5 --timeout-ms 300000 --validate $vst3.FullName
+          if ($LASTEXITCODE -ne 0) { throw "pluginval failed ($LASTEXITCODE)" }
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: circat-thought-windows
+          path: |
+            build/**/Release/Standalone/*.exe
+            build/**/Release/VST3/**/*.vst3
+          if-no-files-found: ignore

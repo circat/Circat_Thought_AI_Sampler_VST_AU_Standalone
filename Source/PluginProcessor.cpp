@@ -5,7 +5,7 @@
  #include <CircatLog.h>
 #endif
 
-namespace { const char* kPluginLogName = "Circat Thought"; const char* kPluginVersion = "v0.7.0 beta"; }
+namespace { const char* kPluginLogName = "Circat Thought"; const char* kPluginVersion = "v0.8.0 beta"; }
 
 void circatLog (const juce::String& line)
 {

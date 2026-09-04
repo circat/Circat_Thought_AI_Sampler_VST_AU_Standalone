@@ -66,7 +66,7 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     promptBuilder.onClick = [this] { openMixer(); };
     addAndMakeVisible (promptBuilder);
 #if CIRCAT_HAS_ABOUT
-    about.setPluginInfo ("CIRCAT THOUGHT", "v0.7.0 beta");
+    about.setPluginInfo ("CIRCAT THOUGHT", "v0.8.0 beta");
     about.setLogName ("Circat Thought");
     about.attachTo (*this);
     cornerLogo = juce::Drawable::createFromImageData (CircatAboutData::CMlogo_svg, (size_t) CircatAboutData::CMlogo_svgSize);
@@ -305,7 +305,7 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
                   juce::Justification::centred);
     g.setColour (ct::textDim);
     g.setFont (juce::Font (11.0f).withExtraKerningFactor (0.10f));
-    g.drawText ("AI SAMPLER  //  STABLE AUDIO OPEN  //  BETA 0.7",
+    g.drawText ("AI SAMPLER  //  STABLE AUDIO OPEN  //  BETA 0.8",
                 juce::Rectangle<int> (panel.getX(), panel.getY() + 52, panel.getWidth(), 14),
                 juce::Justification::centred, false);
 

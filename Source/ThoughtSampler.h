@@ -44,9 +44,18 @@ public:
     float getPitchTuning() const noexcept { return tuning.load (std::memory_order_relaxed); }
     void setAmpEnvelope (float attack, float decay, float sustain, float release) noexcept;
     void setInputDriveDb (float db) noexcept { inputDriveDb.store (juce::jlimit (0.0f, 24.0f, db), std::memory_order_relaxed); }
+    void setOutputGainDb (float db) noexcept { outputGainDb.store (juce::jlimit (-60.0f, 12.0f, db), std::memory_order_relaxed); }
+    float getAndClearOutputPeak() noexcept { return outputPeak.exchange (0.0f, std::memory_order_acq_rel); }
+    // 0 bypass, 1 low-pass, 2 high-pass, 3 band-pass.
+    void setFilter (int mode, float cutoffHz, float resonance) noexcept;
+    void setFilterEnvelope (float attack, float decay, float sustain, float release, float amountOctaves) noexcept;
     void setRegion (float start, float end) noexcept;
+    // 0 off, 1 forward loop, 2 alternating (ping-pong) loop.
+    void setLoop (int mode, float start, float end, float fadeSeconds) noexcept;
     float getRegionStart() const noexcept { return regionStart.load (std::memory_order_relaxed); }
     float getRegionEnd() const noexcept { return regionEnd.load (std::memory_order_relaxed); }
+    float getLoopStart() const noexcept { return loopStart.load (std::memory_order_relaxed); }
+    float getLoopEnd() const noexcept { return loopEnd.load (std::memory_order_relaxed); }
 
     // Renders into the supplied buffer. The buffer is cleared and MIDI is consumed in timestamp order.
     // No locks or allocations are taken by this method.
@@ -59,7 +68,13 @@ private:
     std::atomic<float> tuning { 0.0f };
     std::atomic<float> ampAttack { 0.005f }, ampDecay { 0.15f }, ampSustain { 0.85f }, ampRelease { 0.25f };
     std::atomic<float> inputDriveDb { 0.0f };
+    std::atomic<float> outputGainDb { 0.0f }, outputPeak { 0.0f };
+    std::atomic<int> filterMode { 1 };
+    std::atomic<float> filterCutoff { 8000.0f }, filterResonance { 0.12f };
+    std::atomic<float> filterAttack { 0.005f }, filterDecay { 0.20f }, filterSustain { 0.0f }, filterRelease { 0.20f }, filterAmount { 0.0f };
     std::atomic<float> regionStart { 0.0f }, regionEnd { 1.0f };
+    std::atomic<int> loopMode { 0 };
+    std::atomic<float> loopStart { 0.0f }, loopEnd { 1.0f }, loopFadeSeconds { 0.005f };
     std::atomic<const ThoughtSampleData*> currentSample { nullptr };
 
     // Old samples are intentionally retained until destruction. This makes a swap safe even when a

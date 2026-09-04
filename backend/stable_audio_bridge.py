@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import secrets
 import threading
 import time
 import gc
 import wave
+from pathlib import Path
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -16,6 +18,27 @@ HOST, PORT = "127.0.0.1", 8585
 _model = _config = None
 _lock = threading.Lock()
 _state, _load_started_at, _last_error = "unloaded", None, ""
+
+
+def acquire_single_instance_lock():
+    """Keep the lock handle alive for the bridge lifetime (Windows only)."""
+    if os.name != "nt":
+        return object()
+    import msvcrt
+    directory = Path(os.environ.get("LOCALAPPDATA", ".")) / "Circat" / "CircatThought"
+    directory.mkdir(parents=True, exist_ok=True)
+    lock_path = directory / "stable_audio_bridge.lock"
+    handle = open(lock_path, "a+b")
+    if lock_path.stat().st_size == 0:
+        handle.write(b"0")
+        handle.flush()
+    handle.seek(0)
+    try:
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+    except OSError:
+        handle.close()
+        return None
+    return handle
 
 
 def get_model():
@@ -108,6 +131,11 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_): pass
 
 
-# Bind first. A second plug-in instance then fails immediately instead of
-# allocating another GPU model while waiting to discover that the port is busy.
-ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
+if __name__ == "__main__":
+    # The batch file can be invoked by several DAW/plugin instances at once.
+    # A file lock is acquired before binding or loading any model, so exactly
+    # one bridge process may continue.
+    instance_lock = acquire_single_instance_lock()
+    if instance_lock is None:
+        raise SystemExit(0)
+    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

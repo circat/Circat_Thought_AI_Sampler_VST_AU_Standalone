@@ -2,6 +2,8 @@
 
 Local AI sampler for VST3/AU and Standalone. Type a prompt, generate a one-shot with **Stable Audio Open**, and play it chromatically over MIDI. Audio and prompts stay local.
 
+https://huggingface.co/stabilityai/stable-audio-open-1.0
+
 ## Licence
 
 Circat Thought source code is licensed under **GPL-3.0-or-later**. Stable Audio

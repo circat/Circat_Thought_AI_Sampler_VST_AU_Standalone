@@ -15,7 +15,7 @@ LocalAiWorker::~LocalAiWorker()
     stopThread (3000);
 }
 
-void LocalAiWorker::request (juce::String prompt)
+void LocalAiWorker::request (juce::String prompt, float duration, int steps, float cfg, int seed)
 {
     prompt = prompt.trim();
     if (prompt.isEmpty()) return;
@@ -23,6 +23,10 @@ void LocalAiWorker::request (juce::String prompt)
         const juce::ScopedLock lock (requestLock);
         pendingPrompt = std::move (prompt);
         pendingReferencePath = referenceAudioPath;
+        pendingDuration = juce::jlimit (1.0f, 6.0f, duration);
+        pendingSteps = juce::jlimit (10, 250, steps);
+        pendingCfg = juce::jlimit (1.0f, 12.0f, cfg);
+        pendingSeed = seed < 0 ? -1 : juce::jlimit (0, 2147483646, seed);
     }
     status.store (Status::generating, std::memory_order_release);
     {
@@ -89,12 +93,15 @@ void LocalAiWorker::run()
         if (command != 0) { postModelCommand (command == 1 ? "/v1/model/load" : "/v1/model/unload"); continue; }
         juce::String prompt;
         juce::String referencePath;
+        float duration = 3.0f, cfg = 6.0f;
+        int steps = 100, seed = -1;
         {
             const juce::ScopedLock lock (requestLock);
             prompt = pendingPrompt;
             referencePath = pendingReferencePath;
             pendingPrompt.clear();
             pendingReferencePath.clear();
+            duration = pendingDuration; steps = pendingSteps; cfg = pendingCfg; seed = pendingSeed;
         }
         if (prompt.isEmpty())
         {
@@ -107,7 +114,7 @@ void LocalAiWorker::run()
         }
 
         juce::String error;
-        const bool ok = generate (prompt, referencePath, error);
+        const bool ok = generate (prompt, referencePath, duration, steps, cfg, seed, error);
         status.store (ok ? Status::ready : Status::error, std::memory_order_release);
         const juce::ScopedLock lock (statusLock);
         statusText = ok ? "Sample ready — play MIDI" : "AI error: " + error;
@@ -159,12 +166,15 @@ void LocalAiWorker::refreshHealth()
         statusText = "Stable Audio Open: " + state;
 }
 
-bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& referencePath, juce::String& error)
+bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& referencePath, float duration, int steps, float cfg, int seed, juce::String& error)
 {
     auto body = juce::JSON::toString (juce::var (new juce::DynamicObject()));
     auto payload = juce::DynamicObject::Ptr (new juce::DynamicObject());
     payload->setProperty ("prompt", prompt.substring (0, 512));
-    payload->setProperty ("duration", 3.0);
+    payload->setProperty ("duration", duration);
+    payload->setProperty ("steps", steps);
+    payload->setProperty ("cfg", cfg);
+    payload->setProperty ("seed", seed);
     payload->setProperty ("sample_rate", 44100);
     if (referencePath.isNotEmpty()) payload->setProperty ("reference_audio_path", referencePath);
     body = juce::JSON::toString (juce::var (payload.get()));
@@ -178,7 +188,7 @@ bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& re
         .withConnectionTimeoutMs (600000)
         .withStatusCode (&httpStatus);
     auto stream = std::unique_ptr<juce::InputStream> (endpoint.withPOSTData (body).createInputStream (options));
-    if (stream == nullptr) { error = "bridge connection failed (start backend/mock_bridge.py)"; return false; }
+    if (stream == nullptr) { error = "bridge connection failed (start backend/start_stable_audio.bat)"; return false; }
     if (httpStatus < 200 || httpStatus >= 300) { error = "bridge HTTP " + juce::String (httpStatus); return false; }
 
     juce::MemoryBlock response;

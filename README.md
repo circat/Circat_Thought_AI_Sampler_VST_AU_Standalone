@@ -1,6 +1,6 @@
 # Circat Thought VSTi
 
-**Status: Beta 0.8** — feature-complete for testing; APIs and preset format may still change.
+**Status: Beta 0.8.1** — feature-complete for testing; APIs and preset format may still change.
 
 Local AI sampler for VST3/AU and Standalone. Type a prompt, generate a one-shot with **Stable Audio Open**, and play it chromatically over MIDI. Audio and prompts stay local.
 

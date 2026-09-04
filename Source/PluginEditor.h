@@ -2,6 +2,7 @@
 
 #include "PluginProcessor.h"
 #include "GeneratedBrowser.h"
+#include "PromptMixer.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>
 
@@ -142,11 +143,13 @@ public:
 private:
     void timerCallback() override;
     void openBrowser();
+    void openMixer();
     CircatThoughtLookAndFeel lookAndFeel;
     CircatThoughtProcessor& processor;
     juce::TextEditor prompt;
     juce::TextButton generate { "GENERATE" };
     juce::TextButton browseSamples { "SAMPLE BROWSER" };
+    juce::TextButton promptBuilder { "PROMPT BUILDER" };
     juce::TextButton autoSlice { "AUTO SLICE" };
     juce::TextButton savePreset { "SAVE" }, loadPreset { "LOAD" };
     juce::TextButton saveSample { "EXPORT WAV" };
@@ -175,6 +178,7 @@ private:
     juce::Label filterLabel { {}, "FILTER" }, cutoffLabel { {}, "CUT" }, resonanceLabel { {}, "RES" }, filterAttackLabel { {}, "FA" }, filterDecayLabel { {}, "FD" }, filterSustainLabel { {}, "FS" }, filterReleaseLabel { {}, "FR" }, filterAmountLabel { {}, "ENV" };
     std::unique_ptr<juce::FileChooser> referenceChooser;
     std::unique_ptr<GeneratedBrowser> browser;
+    std::unique_ptr<PromptMixer> mixer;
     juce::Rectangle<int> logoHit;
     double animPhase = 0.0;
 #if CIRCAT_HAS_ABOUT

@@ -19,6 +19,8 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     addAndMakeVisible (generate);
     browseSamples.onClick = [this] { openBrowser(); };
     addAndMakeVisible (browseSamples);
+    promptBuilder.onClick = [this] { openMixer(); };
+    addAndMakeVisible (promptBuilder);
 #if CIRCAT_HAS_ABOUT
     about.setPluginInfo ("CIRCAT THOUGHT", "v0.1.0");
     about.setLogName ("Circat Thought");
@@ -326,6 +328,20 @@ void CircatThoughtEditor::openBrowser()
     browser->setBounds (getLocalBounds());
 }
 
+void CircatThoughtEditor::openMixer()
+{
+    if (mixer != nullptr) { mixer.reset(); return; }
+    mixer = std::make_unique<PromptMixer>();
+    mixer->onClose = [this] { mixer.reset(); };
+    mixer->onUsePrompt = [this] (juce::String p)
+    {
+        prompt.setText (p, false);
+        promptPreset.setSelectedId (1, juce::dontSendNotification);
+    };
+    addAndMakeVisible (*mixer);
+    mixer->setBounds (getLocalBounds());
+}
+
 void CircatThoughtEditor::resized()
 {
     const int top = 60, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
@@ -334,6 +350,7 @@ void CircatThoughtEditor::resized()
     commandView.setBounds (ai.removeFromTop (22));
     generationProgressBar.setBounds (ai.removeFromTop (8)); ai.removeFromTop (5);
     promptPreset.setBounds (ai.removeFromTop (24)); ai.removeFromTop (4);
+    promptBuilder.setBounds (ai.removeFromTop (24)); ai.removeFromTop (4);
     auto aiParam = [&ai] (juce::Label& label, juce::Slider& slider)
     { label.setBounds (ai.removeFromTop (20).removeFromLeft (52)); slider.setBounds (ai.removeFromTop (20)); };
     aiParam (durationLabel, aiDuration); aiParam (stepsLabel, aiSteps); aiParam (cfgLabel, aiCfg); aiParam (seedLabel, aiSeed);
@@ -384,6 +401,7 @@ void CircatThoughtEditor::resized()
     filterArea.removeFromTop (4); placeFilterKnob (filterAmountLabel, filterAmount);
 
     if (browser != nullptr) browser->setBounds (getLocalBounds());
+    if (mixer != nullptr) mixer->setBounds (getLocalBounds());
 #if CIRCAT_HAS_ABOUT
     about.setBounds (getLocalBounds());
 #endif

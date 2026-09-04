@@ -157,6 +157,7 @@ void CircatThoughtProcessor::getStateInformation (juce::MemoryBlock& target)
     state.setProperty ("pitchOctave", pitchOctave.load(), nullptr);
     state.setProperty ("pitchSemitone", pitchSemitone.load(), nullptr);
     state.setProperty ("pitchFineCents", pitchFineCents.load(), nullptr);
+    state.setProperty ("qualityMode", qualityMode.load(), nullptr);
     if (auto xml = state.createXml()) copyXmlToBinary (*xml, target);
 }
 
@@ -189,6 +190,8 @@ void CircatThoughtProcessor::setStateInformation (const void* data, int size)
             pitchSemitone.store (i ("pitchSemitone", 0));
             pitchFineCents.store ((float) d ("pitchFineCents", 0.0));
             applyPitch();
+            qualityMode.store (juce::jlimit (0, 2, i ("qualityMode", 0)));
+            worker.setSamplerType (qualityMode.load() == 0 ? "pingpong" : "dpmpp-3m-sde");
         }
 }
 

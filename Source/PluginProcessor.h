@@ -36,6 +36,9 @@ public:
 
     void generate (const juce::String& prompt, float duration = 3.0f, int steps = 14, float cfg = 6.0f, int seed = -1);
     void setReferenceAudio (juce::File file) { worker.setReferenceAudio (std::move (file)); }
+    void setSamplerType (juce::String type) { worker.setSamplerType (std::move (type)); }
+    void setQualityMode (int mode) noexcept { qualityMode.store (juce::jlimit (0, 2, mode)); }
+    int getQualityMode() const noexcept { return qualityMode.load(); }
     void loadAiModel() { worker.loadModel(); }
     void unloadAiModel() { worker.unloadModel(); }
     void setSampleRegion (float start, float end) noexcept;
@@ -91,7 +94,7 @@ private:
     juce::String prompt { "Brass, D-minor chord, rising" };
     std::atomic<float> aiDuration { 3.0f }, aiCfg { 6.0f }, ampAttack { 0.005f }, ampDecay { 0.15f }, ampSustain { 0.85f }, ampRelease { 0.25f }, drive { 0.0f }, outputGain { 0.0f }, filterCutoff { 8000.0f }, filterResonance { 0.12f }, filterAttack { 0.005f }, filterDecay { 0.2f }, filterSustain { 0.0f }, filterRelease { 0.2f }, filterAmount { 0.0f };
     std::atomic<int> aiSteps { 14 }, aiSeed { -1 }, filterMode { 1 }, loopMode { 0 };
-    std::atomic<int> pitchOctave { 0 }, pitchSemitone { 0 };
+    std::atomic<int> pitchOctave { 0 }, pitchSemitone { 0 }, qualityMode { 0 };
     std::atomic<float> pitchFineCents { 0.0f };
     void applyPitch() noexcept;
     std::atomic<float> loopStart { 0.0f }, loopEnd { 1.0f }, loopFade { 0.005f };

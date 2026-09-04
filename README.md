@@ -31,9 +31,11 @@ model (~1.2 B parameters) plus a T5 text encoder. Total download ≈ **9 GB**
 (`model.safetensors` ≈ 4.9 GB, T5 encoder ≈ 3.5 GB, configs). Weights are pulled
 into the standard Hugging Face cache and are **not** bundled with this repo.
 
-Inference uses ≈ 6–8 GB VRAM at fp16. A one-shot at the default 14 pingpong
-steps + fp16 generates in a few seconds on a recent 24 GB NVIDIA card; the first
-generation after the bridge starts is slower (kernel warm-up).
+Inference uses ≈ 6–8 GB VRAM at fp16. The plugin's **QUALITY** switch picks the
+trade-off: **FAST** (14 pingpong steps, a few seconds on a 24 GB NVIDIA card),
+**BALANCED** (40 steps, dpmpp-3m-sde), **QUALITY** (110 steps). The `STEPS`
+slider still overrides the count. The first generation after the bridge starts
+is slower (kernel warm-up).
 
 ### Reference test system
 

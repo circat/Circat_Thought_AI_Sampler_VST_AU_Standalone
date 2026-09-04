@@ -166,6 +166,8 @@ private:
     juce::ProgressBar generationProgressBar { generationProgress };
     juce::int64 generationStartedMs = 0;
     juce::ComboBox promptPreset;
+    juce::ComboBox qualityMode;
+    juce::Label qualityLabel { {}, "QUALITY" };
     juce::Slider aiDuration, aiSteps, aiCfg, aiSeed;
     juce::Label durationLabel { {}, "SEC" }, stepsLabel { {}, "STEPS" }, cfgLabel { {}, "CFG" }, seedLabel { {}, "SEED" };
     juce::Label referenceStatus;

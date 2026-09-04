@@ -144,7 +144,11 @@ _NEGATIVE_PROMPT = (
 )
 
 
-def generate(prompt: str, duration: float, steps: int = 14, cfg: float = 6.0, seed: int = -1) -> bytes:
+_SAMPLERS = {"pingpong", "dpmpp-3m-sde", "dpmpp-2m-sde", "k-heun", "k-dpm-fast", "k-dpm-adaptive"}
+
+
+def generate(prompt: str, duration: float, steps: int = 14, cfg: float = 6.0,
+             seed: int = -1, sampler_type: str = "pingpong") -> bytes:
     import torch
     from stable_audio_tools.inference.generation import generate_diffusion_cond
 
@@ -160,8 +164,10 @@ def generate(prompt: str, duration: float, steps: int = 14, cfg: float = 6.0, se
     conditioning = [{"prompt": prompt, "seconds_start": 0, "seconds_total": duration}]
     negative = [{"prompt": _NEGATIVE_PROMPT, "seconds_start": 0, "seconds_total": duration}]
 
-    if steps > 12 and _MODEL_KEY == "small":
-        steps = 12  # the distilled model needs only a handful of pingpong steps
+    sampler = sampler_type if sampler_type in _SAMPLERS else "pingpong"
+    if _MODEL_KEY == "small":
+        sampler = "pingpong"            # the distilled model only trained for pingpong
+        steps = min(steps, 12)
 
     autocast = (torch.autocast("cuda", dtype=torch.float16)
                 if device == "cuda" else contextlib.nullcontext())
@@ -170,7 +176,7 @@ def generate(prompt: str, duration: float, steps: int = 14, cfg: float = 6.0, se
             model, conditioning=conditioning, negative_conditioning=negative,
             steps=steps, cfg_scale=cfg, seed=seed,
             sample_size=int(config["sample_size"]),
-            sampler_type="pingpong", sigma_min=0.03, sigma_max=500, device=device)[0]
+            sampler_type=sampler, sigma_min=0.03, sigma_max=500, device=device)[0]
     audio = audio[:, :int(rate * duration)].detach().float().cpu().clamp(-1, 1)
     pcm = (audio * 32767).to(torch.int16).transpose(0, 1).numpy().tobytes()
     result = io.BytesIO()
@@ -212,9 +218,10 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
             prompt, duration = body.get("prompt", ""), float(body.get("duration", 3.0))
             steps = int(body.get("steps", 14)); cfg = float(body.get("cfg", 6.0)); seed = int(body.get("seed", -1))
+            sampler_type = str(body.get("sampler_type", "pingpong"))
             if not isinstance(prompt, str) or not prompt.strip() or not 1 <= duration <= 6: raise ValueError("prompt and 1-6 second duration required")
             if not 4 <= steps <= 250 or not 1.0 <= cfg <= 12.0 or not -1 <= seed < 2**31: raise ValueError("invalid steps, cfg, or seed")
-            data = generate(prompt.strip(), duration, steps, cfg, seed)
+            data = generate(prompt.strip(), duration, steps, cfg, seed, sampler_type)
             _touch()
             self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("Content-Length", str(len(data)))
             self.end_headers(); self.wfile.write(data)

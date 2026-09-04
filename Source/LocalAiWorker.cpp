@@ -52,6 +52,12 @@ void LocalAiWorker::setReferenceAudio (juce::File file)
     const juce::ScopedLock lock (requestLock);
     referenceAudioPath = file.existsAsFile() ? file.getFullPathName() : juce::String();
 }
+
+void LocalAiWorker::setSamplerType (juce::String type)
+{
+    const juce::ScopedLock lock (requestLock);
+    samplerType = type.isEmpty() ? juce::String ("pingpong") : std::move (type);
+}
 void LocalAiWorker::loadModel() { modelCommand.store (1); notify(); }
 void LocalAiWorker::unloadModel() { modelCommand.store (2); notify(); }
 
@@ -104,12 +110,14 @@ void LocalAiWorker::run()
         if (command != 0) { postModelCommand (command == 1 ? "/v1/model/load" : "/v1/model/unload"); continue; }
         juce::String prompt;
         juce::String referencePath;
+        juce::String sampler;
         float duration = 3.0f, cfg = 6.0f;
         int steps = 100, seed = -1;
         {
             const juce::ScopedLock lock (requestLock);
             prompt = pendingPrompt;
             referencePath = pendingReferencePath;
+            sampler = samplerType;
             pendingPrompt.clear();
             pendingReferencePath.clear();
             duration = pendingDuration; steps = pendingSteps; cfg = pendingCfg; seed = pendingSeed;
@@ -137,7 +145,7 @@ void LocalAiWorker::run()
             statusText = "Generating locally…";
         }
         if (ok)
-            ok = generate (prompt, referencePath, duration, steps, cfg, seed, error);
+            ok = generate (prompt, referencePath, sampler, duration, steps, cfg, seed, error);
         status.store (ok ? Status::ready : Status::error, std::memory_order_release);
         {
             const juce::ScopedLock lock (statusLock);
@@ -244,7 +252,7 @@ void LocalAiWorker::refreshHealth()
         statusText = "Stable Audio Open: " + state;
 }
 
-bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& referencePath, float duration, int steps, float cfg, int seed, juce::String& error)
+bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& referencePath, const juce::String& samplerTypeName, float duration, int steps, float cfg, int seed, juce::String& error)
 {
     auto body = juce::JSON::toString (juce::var (new juce::DynamicObject()));
     auto payload = juce::DynamicObject::Ptr (new juce::DynamicObject());
@@ -254,6 +262,7 @@ bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& re
     payload->setProperty ("cfg", cfg);
     payload->setProperty ("seed", seed);
     payload->setProperty ("sample_rate", 44100);
+    payload->setProperty ("sampler_type", samplerTypeName.isNotEmpty() ? samplerTypeName : juce::String ("pingpong"));
     if (referencePath.isNotEmpty()) payload->setProperty ("reference_audio_path", referencePath);
     body = juce::JSON::toString (juce::var (payload.get()));
 

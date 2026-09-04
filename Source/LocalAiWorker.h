@@ -15,6 +15,7 @@ public:
 
     void request (juce::String prompt, float duration, int steps, float cfg, int seed);
     void setReferenceAudio (juce::File file);
+    void setSamplerType (juce::String type);
     void loadModel();
     void unloadModel();
     Status getStatus() const noexcept;
@@ -32,12 +33,13 @@ private:
     void postModelCommand (const juce::String& path);
     static void trimToEvent (juce::AudioBuffer<float>& audio, double sampleRate);
     void run() override;
-    bool generate (const juce::String& prompt, const juce::String& referencePath, float duration, int steps, float cfg, int seed, juce::String& error);
+    bool generate (const juce::String& prompt, const juce::String& referencePath, const juce::String& samplerTypeName, float duration, int steps, float cfg, int seed, juce::String& error);
 
     ThoughtSampler& sampler;
     std::unique_ptr<juce::ChildProcess> backendStarter;
     juce::CriticalSection requestLock, statusLock;
     juce::String pendingPrompt, pendingReferencePath, referenceAudioPath, statusText { "Ready — enter a prompt and press Generate" };
+    juce::String samplerType { "pingpong" };
     juce::File lastGenerated;
     float pendingDuration = 3.0f, pendingCfg = 6.0f;
     int pendingSteps = 100, pendingSeed = -1;

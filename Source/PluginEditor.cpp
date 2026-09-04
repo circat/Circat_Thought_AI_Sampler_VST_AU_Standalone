@@ -91,6 +91,19 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
             prompt.setText (promptTemplates[index].text, false);
     };
     addAndMakeVisible (promptPreset);
+    qualityMode.addItem ("FAST", 1); qualityMode.addItem ("BALANCED", 2); qualityMode.addItem ("QUALITY", 3);
+    qualityMode.onChange = [this]
+    {
+        const int m = juce::jlimit (0, 2, qualityMode.getSelectedId() - 1);
+        processor.setQualityMode (m);
+        const int stepsPreset[] = { 14, 40, 110 };
+        const char* samplers[] = { "pingpong", "dpmpp-3m-sde", "dpmpp-3m-sde" };
+        aiSteps.setValue (stepsPreset[m]);
+        processor.setSamplerType (samplers[m]);
+    };
+    addAndMakeVisible (qualityMode);
+    qualityLabel.setColour (juce::Label::textColourId, juce::Colour (0xff858f96));
+    addAndMakeVisible (qualityLabel);
     for (auto* slider : { &aiDuration, &aiSteps, &aiCfg, &aiSeed })
     { slider->setSliderStyle (juce::Slider::LinearBar); slider->setTextBoxStyle (juce::Slider::TextBoxRight, false, 54, 20); slider->setColour (juce::Slider::trackColourId, juce::Colour (0xffd9a557)); addAndMakeVisible (*slider); }
     aiDuration.setRange (1.0, 6.0, 0.1); aiDuration.setValue (processor.getAiDuration(), juce::dontSendNotification);
@@ -100,7 +113,7 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     aiSeed.setValue (processor.getAiSeed(), juce::dontSendNotification);
     for (auto* label : { &durationLabel, &stepsLabel, &cfgLabel, &seedLabel }) { label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
     generationParameters.setText (
-        "ONE-SHOT  ·  3.0 s target  ·  14 steps (pingpong)  ·  CFG 6.0  ·  random seed\n"
+        "QUALITY: FAST 14 steps pingpong  ·  BALANCED 40  ·  QUALITY 110 steps dpmpp-3m-sde\n"
         "Auto-slice keeps the strongest hit, max 2.5 s.\n"
         "Negative conditioning removes drums / rhythm / melody / vocals / reverb — no need to type it.",
         juce::dontSendNotification);
@@ -253,6 +266,7 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     for (auto* label : { &filterLabel, &cutoffLabel, &resonanceLabel, &filterAttackLabel, &filterDecayLabel, &filterSustainLabel, &filterReleaseLabel, &filterAmountLabel })
     { label->setJustificationType (juce::Justification::centred); label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
     { const bool on = loopMode.getSelectedId() > 1; loopStart.setEnabled (on); loopEnd.setEnabled (on); loopFade.setEnabled (on); }
+    qualityMode.setSelectedId (processor.getQualityMode() + 1, juce::dontSendNotification);
     timerCallback();
     startTimerHz (30);
 }
@@ -472,6 +486,7 @@ void CircatThoughtEditor::resized()
     generationProgressBar.setBounds (ai.removeFromTop (8)); ai.removeFromTop (5);
     promptPreset.setBounds (ai.removeFromTop (24)); ai.removeFromTop (4);
     promptBuilder.setBounds (ai.removeFromTop (24)); ai.removeFromTop (4);
+    { auto r = ai.removeFromTop (24); qualityLabel.setBounds (r.removeFromLeft (62)); qualityMode.setBounds (r); ai.removeFromTop (4); }
     auto aiParam = [&ai] (juce::Label& label, juce::Slider& slider)
     { label.setBounds (ai.removeFromTop (20).removeFromLeft (52)); slider.setBounds (ai.removeFromTop (20)); };
     aiParam (durationLabel, aiDuration); aiParam (stepsLabel, aiSteps); aiParam (cfgLabel, aiCfg); aiParam (seedLabel, aiSeed);

@@ -24,7 +24,7 @@ void LocalAiWorker::request (juce::String prompt, float duration, int steps, flo
         pendingPrompt = std::move (prompt);
         pendingReferencePath = referenceAudioPath;
         pendingDuration = juce::jlimit (1.0f, 6.0f, duration);
-        pendingSteps = juce::jlimit (10, 250, steps);
+        pendingSteps = juce::jlimit (4, 250, steps);
         pendingCfg = juce::jlimit (1.0f, 12.0f, cfg);
         pendingSeed = seed < 0 ? -1 : juce::jlimit (0, 2147483646, seed);
     }

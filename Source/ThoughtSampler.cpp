@@ -43,7 +43,7 @@ public:
             filterReleaseStep = juce::jmax (filterSustain, 0.001f) / juce::jmax (1.0f, filterRelease * (float) outputRate);
             filterEnvelope = 0.0f; filterSustainLevel = filterSustain; filterStage = 0;
             filterAmount = filterEnvAmount; filterSampleRate = outputRate;
-            filterLow[0] = filterLow[1] = filterBand[0] = filterBand[1] = 0.0f;
+            svfIc1[0] = svfIc1[1] = svfIc2[0] = svfIc2[1] = 0.0f;
             loopMode = newLoopMode;
             loopStartPosition = lastIndex * juce::jlimit (regionStart, regionEnd - 0.001f, newLoopStart);
             const float minimumLoopEnd = (float) (loopStartPosition / lastIndex) + 0.001f;
@@ -57,7 +57,10 @@ public:
     void noteOff (int midiNote) noexcept
     {
         if (active && (midiNote < 0 || note == midiNote))
+        {
             stage = 3;
+            filterStage = 3;
+        }
     }
 
     bool isActive() const noexcept { return active; }
@@ -104,10 +107,17 @@ public:
             else if (stage == 3) { envelope -= releaseStep; if (envelope <= 0.0f) { active = false; break; } }
             if (filterStage == 0) { filterEnvelope += filterAttackStep; if (filterEnvelope >= 1.0f) { filterEnvelope = 1.0f; filterStage = 1; } }
             else if (filterStage == 1) { filterEnvelope -= filterDecayStep; if (filterEnvelope <= filterSustainLevel) { filterEnvelope = filterSustainLevel; filterStage = 2; } }
-            else if (stage == 3) { filterEnvelope -= filterReleaseStep; if (filterEnvelope < 0.0f) filterEnvelope = 0.0f; }
-            const float cutoff = juce::jlimit (20.0f, 20000.0f, filterCutoff * std::pow (2.0f, filterEnvelope * filterAmount));
-            const float f = juce::jlimit (0.001f, 0.99f, 2.0f * std::sin (juce::MathConstants<float>::pi * cutoff / (float) filterSampleRate));
-            const float damping = juce::jlimit (0.08f, 1.95f, 1.8f - filterResonance * 1.65f);
+            else if (filterStage == 3) { filterEnvelope -= filterReleaseStep; if (filterEnvelope < 0.0f) filterEnvelope = 0.0f; }
+            // TPT / zero-delay-feedback state-variable filter (Zavalishin). Unconditionally
+            // stable across the whole cutoff range, unlike the previous Chamberlin SVF which
+            // blew up above ~fs/6 (default 8 kHz cutoff => silent output on load).
+            const float cutoffHz = juce::jlimit (20.0f, (float) filterSampleRate * 0.45f,
+                                                 filterCutoff * std::pow (2.0f, filterEnvelope * filterAmount));
+            const float g = std::tan (juce::MathConstants<float>::pi * cutoffHz / (float) filterSampleRate);
+            const float k = 2.0f - 1.9f * juce::jlimit (0.0f, 1.0f, filterResonance); // 2.0 (clean) .. 0.1 (resonant)
+            const float a1 = 1.0f / (1.0f + g * (g + k));
+            const float a2 = g * a1;
+            const float a3 = g * a2;
             for (int channel = 0; channel < outputChannels; ++channel)
             {
                 const int sourceChannel = std::min (channel, sourceChannels - 1);
@@ -124,11 +134,18 @@ public:
                 }
                 if (filterMode != 0)
                 {
-                    const int stateChannel = juce::jmin (channel, 1);
-                    filterLow[stateChannel] += f * filterBand[stateChannel];
-                    const float high = value - filterLow[stateChannel] - damping * filterBand[stateChannel];
-                    filterBand[stateChannel] += f * high;
-                    value = filterMode == 1 ? filterLow[stateChannel] : (filterMode == 2 ? high : filterBand[stateChannel]);
+                    const int sc = juce::jmin (channel, 1);
+                    const float v3 = value - svfIc2[sc];
+                    const float v1 = a1 * svfIc1[sc] + a2 * v3;
+                    const float v2 = svfIc2[sc] + a2 * svfIc1[sc] + a3 * v3;
+                    svfIc1[sc] = 2.0f * v1 - svfIc1[sc];
+                    svfIc2[sc] = 2.0f * v2 - svfIc2[sc];
+                    const float low = v2;
+                    const float band = v1;
+                    const float high = value - k * v1 - v2;
+                    value = filterMode == 1 ? low : (filterMode == 2 ? high : band);
+                    if (! std::isfinite (value)) { svfIc1[sc] = svfIc2[sc] = 0.0f; value = 0.0f; }
+                    value = juce::jlimit (-4.0f, 4.0f, value);
                 }
                 output.addSample (channel, start + i, value * gain * envelope);
             }
@@ -143,7 +160,7 @@ private:
     int loopFadeSamples = 0;
     float gain = 0.0f;
     float envelope = 0.0f, attackStep = 1.0f, decayStep = 0.0f, releaseStep = 1.0f, sustainLevel = 1.0f;
-    float filterLow[2] {}, filterBand[2] {};
+    float svfIc1[2] {}, svfIc2[2] {};
     float filterCutoff = 8000.0f, filterResonance = 0.12f, filterAmount = 0.0f;
     float filterEnvelope = 0.0f, filterAttackStep = 1.0f, filterDecayStep = 0.0f, filterReleaseStep = 1.0f, filterSustainLevel = 0.0f;
     double filterSampleRate = 44100.0;

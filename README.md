@@ -46,3 +46,16 @@ cmake --build build --config Release --target CircatThought_Standalone
 ```
 
 VST3: add `-DCIRCAT_BUILD_VST3=ON`. AU on macOS: add `-DCIRCAT_BUILD_AU=ON`.
+
+
+## Support
+
+Circat Media // Erich Lesovsky  
+hello@circat.media  
+www.circat.media
+
+buymeacoffee.com/MigraineBoy
+
+## Legal
+
+© 2026 Circat Media // Erich Lesovsky. All rights reserved.

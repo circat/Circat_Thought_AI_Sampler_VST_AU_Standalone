@@ -1,8 +1,11 @@
 #include "PluginEditor.h"
 
+#include <cmath>
+
 CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProcessorEditor (&p), processor (p)
 {
     setSize (1280, 800);
+    setLookAndFeel (&lookAndFeel);
     prompt.setText (processor.getPrompt());
     prompt.setMultiLine (true);
     prompt.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff17191d));
@@ -26,22 +29,25 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     commandView.setFont (juce::Font (11.0f)); addAndMakeVisible (commandView);
     generationProgressBar.setColour (juce::ProgressBar::foregroundColourId, juce::Colour (0xffd9a557));
     generationProgressBar.setColour (juce::ProgressBar::backgroundColourId, juce::Colour (0xff17191d)); addAndMakeVisible (generationProgressBar);
-    promptPreset.addItem ("CUSTOM PROMPT", 1); promptPreset.addItem ("SINGLE NOTE", 2); promptPreset.addItem ("CHORD", 3); promptPreset.addItem ("STAB", 4); promptPreset.addItem ("TEXTURE", 5);
-    promptPreset.setSelectedId (1); promptPreset.onChange = [this]
+    for (int i = 0; i < numPromptTemplates; ++i)
+        promptPreset.addItem (promptTemplates[i].name, i + 1);
+    promptPreset.setSelectedId (1);
+    promptPreset.onChange = [this]
     {
-        const juce::String suffix[] = { "", "single isolated sustained note, dry studio", "single sustained chord, static harmony, dry studio", "single chord stab, sharp transient, dry studio", "isolated tonal texture, dry studio" };
-        if (promptPreset.getSelectedId() > 1) prompt.setText (prompt.getText().upToFirstOccurrenceOf (", isolated sampler one-shot", false, false).trimCharactersAtEnd (", ") + ", " + suffix[promptPreset.getSelectedId() - 1]);
+        const int index = promptPreset.getSelectedId() - 1;
+        if (index > 0 && index < numPromptTemplates)
+            prompt.setText (promptTemplates[index].text, false);
     };
     addAndMakeVisible (promptPreset);
     for (auto* slider : { &aiDuration, &aiSteps, &aiCfg, &aiSeed })
     { slider->setSliderStyle (juce::Slider::LinearBar); slider->setTextBoxStyle (juce::Slider::TextBoxRight, false, 54, 20); slider->setColour (juce::Slider::trackColourId, juce::Colour (0xffd9a557)); addAndMakeVisible (*slider); }
     aiDuration.setRange (1.0, 6.0, 0.1); aiDuration.setValue (3.0);
-    aiSteps.setRange (10, 250, 1); aiSteps.setValue (100);
+    aiSteps.setRange (4, 250, 1); aiSteps.setValue (14);
     aiCfg.setRange (1.0, 12.0, 0.1); aiCfg.setValue (6.0);
     aiSeed.setRange (-1, 2147483646.0, 1); aiSeed.setSkewFactorFromMidPoint (1000.0); aiSeed.setValue (-1);
     for (auto* label : { &durationLabel, &stepsLabel, &cfgLabel, &seedLabel }) { label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
     generationParameters.setText (
-        "ONE-SHOT  ·  3.0 s target  ·  100 steps  ·  CFG 6.0  ·  random seed\n"
+        "ONE-SHOT  ·  3.0 s target  ·  14 steps (pingpong)  ·  CFG 6.0  ·  random seed\n"
         "Lyrics: [hit] [silence]  ·  auto-slice: strongest hit, max. 2.5 s\n"
         "Auto tags: solo instrument · one isolated event · no loop · dry mix · zero reverb · direct input · mono compatible · no drums",
         juce::dontSendNotification);
@@ -127,8 +133,7 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     attack.onValueChange = updateEnvelope; decay.onValueChange = updateEnvelope; sustain.onValueChange = updateEnvelope; release.onValueChange = updateEnvelope;
     drive.onValueChange = [this] { processor.setInputDriveDb ((float) drive.getValue()); };
     outputGain.onValueChange = [this] { processor.setOutputGainDb ((float) outputGain.getValue()); };
-    outputMeterBar.setColour (juce::ProgressBar::foregroundColourId, juce::Colour (0xff9ed6b4));
-    outputMeterBar.setColour (juce::ProgressBar::backgroundColourId, juce::Colour (0xff17191d)); addAndMakeVisible (outputMeterBar);
+    addAndMakeVisible (outputMeterBar);
     for (auto* label : { &attackLabel, &decayLabel, &sustainLabel, &releaseLabel, &driveLabel, &outputLabel })
     {
         label->setJustificationType (juce::Justification::centred);
@@ -159,27 +164,30 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     for (auto* label : { &filterLabel, &cutoffLabel, &resonanceLabel, &filterAttackLabel, &filterDecayLabel, &filterSustainLabel, &filterReleaseLabel, &filterAmountLabel })
     { label->setJustificationType (juce::Justification::centred); label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
     timerCallback();
-    startTimerHz (8);
+    startTimerHz (30);
 }
+
+CircatThoughtEditor::~CircatThoughtEditor() { setLookAndFeel (nullptr); }
 
 void CircatThoughtEditor::paint (juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
-    g.fillAll (juce::Colour (0xff1d0d12));
-    juce::ColourGradient velvet (juce::Colour (0xff4a222d), 0.0f, 44.0f, juce::Colour (0xff2d121a), 0.0f, bounds.getBottom(), false);
+    g.fillAll (ct::shell);
+    juce::ColourGradient velvet (ct::velvetTop, 0.0f, 44.0f, ct::velvetBot, 0.0f, bounds.getBottom(), false);
     g.setGradientFill (velvet); g.fillRect (bounds);
-    g.setColour (juce::Colour (0xffd9a557)); g.fillRect (0.0f, 43.0f, bounds.getWidth(), 1.0f);
+    g.setColour (ct::accent); g.fillRect (0.0f, 43.0f, bounds.getWidth(), 1.0f);
+    g.setColour (ct::textPrimary);
     g.setFont (juce::Font (20.0f, juce::Font::bold));
     g.drawText ("CIRCAT THOUGHT", 24, 10, 310, 28, juce::Justification::centredLeft);
-    g.setColour (juce::Colour (0xffcbd0d7)); g.setFont (12.0f);
+    g.setColour (ct::textLabel); g.setFont (12.0f);
     g.drawText ("AI SAMPLER  /  STABLE AUDIO OPEN", 340, 14, 320, 20, juce::Justification::centredLeft);
 
     const int top = 60, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
     const auto card = [&g] (juce::Rectangle<int> r, const juce::String& title)
     {
-        g.setColour (juce::Colour (0x8f160a0f)); g.fillRoundedRectangle (r.toFloat(), 6.0f);
-        g.setColour (juce::Colour (0x44ffffff)); g.drawRoundedRectangle (r.toFloat(), 6.0f, 1.0f);
-        g.setColour (juce::Colour (0xffd9a557)); g.setFont (11.0f);
+        g.setColour (ct::card.withAlpha (0.92f)); g.fillRoundedRectangle (r.toFloat(), 6.0f);
+        g.setColour (ct::cardBorder); g.drawRoundedRectangle (r.toFloat(), 6.0f, 1.0f);
+        g.setColour (ct::accent); g.setFont (11.0f);
         g.drawText (title, r.reduced (16).removeFromTop (20), juce::Justification::centredLeft);
     };
     card ({ left, top, width, getHeight() - top - 24 }, "01 // AI / INPUT");
@@ -276,7 +284,13 @@ void CircatThoughtEditor::timerCallback()
         generationProgress = 1.0;
     else if (processor.getGenerationStatus() == LocalAiWorker::Status::error)
         generationProgress = 0.0;
-    outputMeter = juce::jmax ((double) processor.getAndClearOutputPeak(), outputMeter * 0.82);
+    // Output meter: map the linear inter-block peak onto a -60..+6 dB scale so
+    // the bar tracks perceived level instead of sitting near zero for most signals.
+    const float peakLinear = processor.getAndClearOutputPeak();
+    const double peakDb = peakLinear > 1.0e-6f ? 20.0 * std::log10 ((double) peakLinear) : -120.0;
+    const double meterTarget = juce::jlimit (0.0, 1.0, (peakDb + 60.0) / 66.0);
+    outputMeter = juce::jmax (meterTarget, outputMeter - 0.06); // ~0.5 s fall at 30 Hz
+    outputMeterBar.setValue (outputMeter);
     // Newly generated sample data is swapped on the worker thread. Repaint the
     // display on the message thread so the waveform visibly confirms the load.
     repaint();

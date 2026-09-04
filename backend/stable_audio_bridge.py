@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -49,8 +50,18 @@ def get_model():
             try:
                 import torch
                 from stable_audio_tools import get_pretrained_model
+                # TF32 matmuls: large speedup on Ampere+ (RTX 3090) at no audible cost.
+                torch.backends.cuda.matmul.allow_tf32 = True
+                torch.backends.cudnn.allow_tf32 = True
+                torch.backends.cudnn.benchmark = True
                 _model, _config = get_pretrained_model("stabilityai/stable-audio-open-1.0")
-                _model = _model.to("cuda" if torch.cuda.is_available() else "cpu").eval()
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                _model = _model.to(device).eval()
+                if device == "cuda" and os.environ.get("CIRCAT_COMPILE") == "1":
+                    try:
+                        _model.model = torch.compile(_model.model, mode="reduce-overhead")
+                    except Exception:
+                        pass
                 _state = "ready"
             except Exception as error:
                 _model = _config = None; _state, _last_error = "error", str(error)
@@ -75,7 +86,7 @@ def unload_model() -> None:
         _state, _load_started_at = "unloaded", None
 
 
-def generate(prompt: str, duration: float, steps: int = 100, cfg: float = 6.0, seed: int = -1) -> bytes:
+def generate(prompt: str, duration: float, steps: int = 14, cfg: float = 6.0, seed: int = -1) -> bytes:
     import torch
     from stable_audio_tools.inference.generation import generate_diffusion_cond
 
@@ -87,9 +98,15 @@ def generate(prompt: str, duration: float, steps: int = 100, cfg: float = 6.0, s
         prompt + ", isolated sampler one-shot, single sustained note or chord, dry studio, "
         "no drums, no rhythm, no melody, no sequence, no loop, no vocals, zero reverb"
     ), "seconds_start": 0, "seconds_total": duration}]
-    with torch.inference_mode():
+    # pingpong sampler converges in far fewer steps than dpmpp-3m-sde; fp16 autocast
+    # roughly halves inference time on CUDA. Both are safe for one-shot material.
+    autocast = (torch.autocast("cuda", dtype=torch.float16)
+                if device == "cuda" else contextlib.nullcontext())
+    with torch.inference_mode(), autocast:
         audio = generate_diffusion_cond(model, conditioning=conditioning, steps=steps, cfg_scale=cfg,
-                                       seed=seed, sample_size=int(config["sample_size"]), device=device)[0]
+                                       seed=seed, sample_size=int(config["sample_size"]),
+                                       sampler_type="pingpong", sigma_min=0.03, sigma_max=500,
+                                       device=device)[0]
     audio = audio[:, :int(rate * duration)].detach().float().cpu().clamp(-1, 1)
     pcm = (audio * 32767).to(torch.int16).transpose(0, 1).numpy().tobytes()
     result = io.BytesIO()
@@ -119,9 +136,9 @@ class Handler(BaseHTTPRequestHandler):
             if _state != "ready": raise RuntimeError("model is not loaded — press LOAD MODEL")
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
             prompt, duration = body.get("prompt", ""), float(body.get("duration", 3.0))
-            steps = int(body.get("steps", 100)); cfg = float(body.get("cfg", 6.0)); seed = int(body.get("seed", -1))
+            steps = int(body.get("steps", 14)); cfg = float(body.get("cfg", 6.0)); seed = int(body.get("seed", -1))
             if not isinstance(prompt, str) or not prompt.strip() or not 1 <= duration <= 6: raise ValueError("prompt and 1-6 second duration required")
-            if not 10 <= steps <= 250 or not 1.0 <= cfg <= 12.0 or not -1 <= seed < 2**31: raise ValueError("invalid steps, cfg, or seed")
+            if not 4 <= steps <= 250 or not 1.0 <= cfg <= 12.0 or not -1 <= seed < 2**31: raise ValueError("invalid steps, cfg, or seed")
             data = generate(prompt.strip(), duration, steps, cfg, seed)
             self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("Content-Length", str(len(data)))
             self.end_headers(); self.wfile.write(data)

@@ -268,31 +268,23 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
     const auto full = getLocalBounds();
     g.fillAll (ct::shell);
 
-    // ── panel: warm espresso velvet + studio lighting + inner bevel (S612 master)
+    // ── satin velvet panel (procedural Circat master surface) + inner bevel
     auto panel = full.reduced (8);
     {
         auto mf = panel.toFloat();
-        juce::ColourGradient vg (juce::Colour (0xff2b2420), mf.getCentreX(), mf.getY() + mf.getHeight() * 0.32f,
-                                 juce::Colour (0xff17110d), mf.getX(), mf.getBottom(), true);
-        g.setGradientFill (vg); g.fillRect (panel);
-
-        juce::ColourGradient key (juce::Colour::fromRGBA (255, 236, 210, 42),
-                                  mf.getX() + mf.getWidth() * 0.16f, mf.getY() + mf.getHeight() * 0.02f,
-                                  juce::Colours::transparentWhite,
-                                  mf.getX() + mf.getWidth() * 0.70f, mf.getBottom(), false);
-        g.setGradientFill (key); g.fillRect (panel);
-
-        juce::ColourGradient hot (juce::Colour::fromRGBA (255, 244, 228, 54),
+        if (velvetImg.isValid())
+            g.drawImageAt (velvetImg, panel.getX(), panel.getY());
+        else
+        {
+            g.setColour (ct::velvetBot);
+            g.fillRect (panel);
+        }
+        // warm top-centre hotspot on top of the fabric
+        juce::ColourGradient hot (juce::Colour::fromRGBA (255, 244, 228, 40),
                                   mf.getCentreX(), mf.getY() + mf.getHeight() * 0.05f,
                                   juce::Colours::transparentWhite,
                                   mf.getCentreX(), mf.getY() + mf.getHeight() * 0.55f, true);
         g.setGradientFill (hot); g.fillRect (panel);
-
-        juce::ColourGradient vig (juce::Colours::transparentBlack, mf.getCentreX(), mf.getCentreY(),
-                                  juce::Colours::black.withAlpha (0.55f), mf.getX(), mf.getY(), true);
-        vig.addColour (0.45, juce::Colours::transparentBlack);
-        vig.addColour (0.80, juce::Colours::black.withAlpha (0.18f));
-        g.setGradientFill (vig); g.fillRect (panel);
 
         g.setColour (juce::Colours::white.withAlpha (0.06f));
         g.drawLine (mf.getX() + 1, mf.getY() + 1, mf.getRight() - 1, mf.getY() + 1, 1.0f);
@@ -465,6 +457,12 @@ void CircatThoughtEditor::openMixer()
 
 void CircatThoughtEditor::resized()
 {
+    const auto pr = getLocalBounds().reduced (8);
+    if (pr.getWidth() > 0 && pr.getHeight() > 0
+        && (velvetImg.getWidth() != pr.getWidth() || velvetImg.getHeight() != pr.getHeight()))
+        velvetImg = circat::velvet::render (pr.getWidth(), pr.getHeight(),
+                                            { ct::velvetTop, ct::velvetBot, juce::Colour (0xfffff2df) });
+
     const int top = 84, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
     auto ai = juce::Rectangle<int> (left + 16, top + 40, width - 32, getHeight() - top - 64);
     status.setBounds (ai.removeFromTop (22));

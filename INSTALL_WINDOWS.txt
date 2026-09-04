@@ -1,0 +1,58 @@
+CIRCAT THOUGHT  —  Local AI Sampler  (Beta 0.8.2, Windows x64)
+============================================================
+
+WHAT IT IS
+  Type a prompt, a local Stable Audio Open model generates a one-shot on your
+  GPU, and you play it chromatically over MIDI. Nothing is sent to the cloud.
+
+WHAT YOU NEED
+  - Windows 10/11 64-bit
+  - NVIDIA GPU with a current driver, 8 GB VRAM minimum (12 GB+ recommended).
+    No NVIDIA GPU: it will fall back to CPU and be very slow.
+  - ~25-30 GB free disk during install, ~13-16 GB afterwards
+  - A free Hugging Face account + read token
+  - "uv" installed:  winget install --id Astral-sh.uv --exact
+
+ONE-TIME SETUP
+  1. Open https://huggingface.co/stabilityai/stable-audio-open-1.0 and click
+     "Agree and access repository". Then create a READ token at
+     https://huggingface.co/settings/tokens
+  2. Double-click  install_circat_thought.bat
+  3. Paste the token when asked. The installer downloads CUDA PyTorch and the
+     model (~9 GB) into your user profile. Your token is only handed to the
+     Hugging Face CLI, never stored by this software.
+
+RUNNING
+  1. Double-click  backend\start_stable_audio.bat  and leave that window open.
+  2a. Plugin:  copy  "Circat Thought.vst3"  into
+        C:\Program Files\Common Files\VST3\
+      then rescan plugins in your DAW.
+  2b. Or just run  "Circat Thought.exe"  (standalone, no DAW needed).
+  3. Type a prompt (or use PROMPT BUILDER), pick a QUALITY, press GENERATE,
+     play your MIDI keyboard.
+
+  The model loads itself on the first GENERATE — the first one takes a bit
+  longer while it warms up. The backend closes itself a few minutes after you
+  close the plugin.
+
+QUALITY SWITCH
+  FAST      ~a few seconds, rougher
+  BALANCED  ~10-20 s
+  QUALITY   ~30-60 s, best detail
+
+TROUBLESHOOTING
+  "Bridge connection failed"        -> start backend\start_stable_audio.bat
+  401/403 when the model loads      -> accept the model licence, re-run install
+  CUDA out of memory               -> close other GPU apps
+  First generation seems stuck      -> normal, it is loading the model once
+
+LICENCE
+  Plugin code: GPL-3.0-or-later (see LICENSE).
+  Stable Audio Open weights: Stability AI Community Licence — you download them
+  yourself; they are not included here. See MODEL_LICENSES.md.
+
+SUPPORT
+  hello@circat.media   ·   www.circat.media
+  Click the logo (bottom-right of the plugin) -> SEND LOG to mail a diagnostic.
+
+(c) 2026 Circat Media // Erich Lesovsky

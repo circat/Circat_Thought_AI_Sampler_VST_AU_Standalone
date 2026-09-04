@@ -3,7 +3,6 @@
 #include "PluginProcessor.h"
 #include "GeneratedBrowser.h"
 #include "PromptMixer.h"
-#include "CircatVelvet.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>
 
@@ -162,7 +161,6 @@ private:
     std::unique_ptr<GeneratedBrowser> browser;
     std::unique_ptr<PromptMixer> mixer;
     juce::Rectangle<int> logoHit;
-    juce::Image velvetImg;
     double animPhase = 0.0;
 #if CIRCAT_HAS_ABOUT
     circat::AboutPanel about;

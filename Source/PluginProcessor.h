@@ -47,6 +47,12 @@ public:
     void setFilter (int mode, float cutoffHz, float resonance) noexcept;
     void setFilterEnvelope (float attack, float decay, float sustain, float release, float amount) noexcept;
     void autoSlice() noexcept;
+    void setPitchOctave (int octaves) noexcept;
+    void setPitchSemitone (int semitones) noexcept;
+    void setPitchFineCents (float cents) noexcept;
+    int getPitchOctave() const noexcept { return pitchOctave.load(); }
+    int getPitchSemitone() const noexcept { return pitchSemitone.load(); }
+    float getPitchFineCents() const noexcept { return pitchFineCents.load(); }
     void previewPlay (const juce::File& file) { preview.play (file); }
     void previewStop() { preview.stop(); }
     bool isPreviewPlaying() const noexcept { return preview.isPlaying(); }
@@ -85,6 +91,9 @@ private:
     juce::String prompt { "Brass, D-minor chord, rising" };
     std::atomic<float> aiDuration { 3.0f }, aiCfg { 6.0f }, ampAttack { 0.005f }, ampDecay { 0.15f }, ampSustain { 0.85f }, ampRelease { 0.25f }, drive { 0.0f }, outputGain { 0.0f }, filterCutoff { 8000.0f }, filterResonance { 0.12f }, filterAttack { 0.005f }, filterDecay { 0.2f }, filterSustain { 0.0f }, filterRelease { 0.2f }, filterAmount { 0.0f };
     std::atomic<int> aiSteps { 14 }, aiSeed { -1 }, filterMode { 1 }, loopMode { 0 };
+    std::atomic<int> pitchOctave { 0 }, pitchSemitone { 0 };
+    std::atomic<float> pitchFineCents { 0.0f };
+    void applyPitch() noexcept;
     std::atomic<float> loopStart { 0.0f }, loopEnd { 1.0f }, loopFade { 0.005f };
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CircatThoughtProcessor)
 };

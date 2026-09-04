@@ -173,6 +173,9 @@ private:
     juce::Label loopStartLabel { {}, "LOOP IN" }, loopEndLabel { {}, "LOOP OUT" }, loopFadeLabel { {}, "X-FADE" }, loopModeLabel { {}, "LOOP" };
     juce::Slider start, end, loopStart, loopEnd, loopFade;
     juce::ComboBox loopMode;
+    juce::Slider fineTune, semitone;
+    juce::TextButton octaveDown { juce::CharPointer_UTF8 ("OCT \xE2\x80\x93") }, octaveUp { "OCT +" };
+    juce::Label fineTuneLabel { {}, "FINE" }, semitoneLabel { {}, "SEMI" }, octaveLabel { {}, "OCTAVE" }, octaveValue;
     juce::Slider attack, decay, sustain, release, drive;
     juce::Slider outputGain;
     double outputMeter = 0.0;

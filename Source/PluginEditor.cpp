@@ -66,7 +66,7 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     promptBuilder.onClick = [this] { openMixer(); };
     addAndMakeVisible (promptBuilder);
 #if CIRCAT_HAS_ABOUT
-    about.setPluginInfo ("CIRCAT THOUGHT", "v0.1.0");
+    about.setPluginInfo ("CIRCAT THOUGHT", "v0.7.0 beta");
     about.setLogName ("Circat Thought");
     about.attachTo (*this);
     cornerLogo = juce::Drawable::createFromImageData (CircatAboutData::CMlogo_svg, (size_t) CircatAboutData::CMlogo_svgSize);
@@ -170,6 +170,34 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     loopFade.setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xffd9a557)); addAndMakeVisible (loopFade);
     const auto updateLoop = [this] { processor.setLoop (loopMode.getSelectedId() - 1, (float) loopStart.getValue(), (float) loopEnd.getValue(), (float) loopFade.getValue()); };
     loopStart.onValueChange = updateLoop; loopEnd.onValueChange = updateLoop; loopFade.onValueChange = updateLoop;
+
+    // ── tuning: fine (cents), semitone, octave up/down
+    for (auto* s : { &fineTune, &semitone })
+    {
+        s->setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        s->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 54, 16);
+        s->setColour (juce::Slider::rotarySliderFillColourId, juce::Colour (0xff9ed6b4));
+        addAndMakeVisible (*s);
+    }
+    fineTune.setRange (-100.0, 100.0, 1.0);
+    fineTune.setValue (processor.getPitchFineCents(), juce::dontSendNotification);
+    fineTune.textFromValueFunction = [] (double v) { return juce::String ((int) v) + " ct"; };
+    fineTune.onValueChange = [this] { processor.setPitchFineCents ((float) fineTune.getValue()); };
+    semitone.setRange (-12.0, 12.0, 1.0);
+    semitone.setValue (processor.getPitchSemitone(), juce::dontSendNotification);
+    semitone.textFromValueFunction = [] (double v) { return (v > 0 ? "+" : "") + juce::String ((int) v) + " st"; };
+    semitone.onValueChange = [this] { processor.setPitchSemitone ((int) semitone.getValue()); };
+    const auto refreshOctave = [this]
+    { octaveValue.setText (juce::String (processor.getPitchOctave()), juce::dontSendNotification); };
+    octaveDown.onClick = [this, refreshOctave] { processor.setPitchOctave (processor.getPitchOctave() - 1); refreshOctave(); };
+    octaveUp.onClick   = [this, refreshOctave] { processor.setPitchOctave (processor.getPitchOctave() + 1); refreshOctave(); };
+    octaveValue.setJustificationType (juce::Justification::centred);
+    octaveValue.setColour (juce::Label::textColourId, juce::Colour (0xffe8eaed));
+    octaveValue.setColour (juce::Label::backgroundColourId, juce::Colour (0xff17191d));
+    refreshOctave();
+    addAndMakeVisible (octaveDown); addAndMakeVisible (octaveUp); addAndMakeVisible (octaveValue);
+    for (auto* l : { &fineTuneLabel, &semitoneLabel, &octaveLabel })
+    { l->setJustificationType (juce::Justification::centred); l->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*l); }
     for (auto* label : { &startLabel, &endLabel, &loopStartLabel, &loopEndLabel, &loopFadeLabel, &loopModeLabel })
     {
         label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96));
@@ -277,7 +305,7 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
                   juce::Justification::centred);
     g.setColour (ct::textDim);
     g.setFont (juce::Font (11.0f).withExtraKerningFactor (0.10f));
-    g.drawText ("AI SAMPLER  //  STABLE AUDIO OPEN",
+    g.drawText ("AI SAMPLER  //  STABLE AUDIO OPEN  //  BETA 0.7",
                 juce::Rectangle<int> (panel.getX(), panel.getY() + 52, panel.getWidth(), 14),
                 juce::Justification::centred, false);
 
@@ -457,6 +485,20 @@ void CircatThoughtEditor::resized()
     auto scRow = [&sc] (int h) { auto r = sc.removeFromTop (h); sc.removeFromTop (6); return r; };
     { auto r = scRow (22); startLabel.setBounds (r.removeFromLeft (72)); start.setBounds (r); }
     { auto r = scRow (22); endLabel.setBounds (r.removeFromLeft (72)); end.setBounds (r); }
+    sc.removeFromTop (10);
+    {
+        auto r = scRow (76);
+        const int third = r.getWidth() / 3;
+        auto fc = r.removeFromLeft (third);
+        fineTuneLabel.setBounds (fc.removeFromTop (14)); fineTune.setBounds (fc);
+        auto sm = r.removeFromLeft (third);
+        semitoneLabel.setBounds (sm.removeFromTop (14)); semitone.setBounds (sm);
+        octaveLabel.setBounds (r.removeFromTop (14));
+        auto orow = r.removeFromTop (26);
+        octaveDown.setBounds (orow.removeFromLeft (46)); orow.removeFromLeft (4);
+        octaveValue.setBounds (orow.removeFromLeft (30)); orow.removeFromLeft (4);
+        octaveUp.setBounds (orow.removeFromLeft (46));
+    }
     sc.removeFromTop (10);
     { auto r = scRow (26); loopModeLabel.setBounds (r.removeFromLeft (72)); loopMode.setBounds (r.removeFromLeft (170)); }
     { auto r = scRow (22); loopStartLabel.setBounds (r.removeFromLeft (72)); loopStart.setBounds (r); }

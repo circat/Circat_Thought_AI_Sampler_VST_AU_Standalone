@@ -5,7 +5,7 @@
  #include <CircatLog.h>
 #endif
 
-namespace { const char* kPluginLogName = "Circat Thought"; const char* kPluginVersion = "v0.1.0"; }
+namespace { const char* kPluginLogName = "Circat Thought"; const char* kPluginVersion = "v0.7.0 beta"; }
 
 void circatLog (const juce::String& line)
 {
@@ -49,6 +49,29 @@ juce::AudioProcessorEditor* CircatThoughtProcessor::createEditor() { return new 
 void CircatThoughtProcessor::setSampleRegion (float start, float end) noexcept
 {
     sampler.setRegion (start, end);
+}
+
+void CircatThoughtProcessor::applyPitch() noexcept
+{
+    const float semis = (float) pitchOctave.load() * 12.0f
+                      + (float) pitchSemitone.load()
+                      + pitchFineCents.load() * 0.01f;
+    sampler.setPitchTuning (semis);
+}
+
+void CircatThoughtProcessor::setPitchOctave (int octaves) noexcept
+{
+    pitchOctave.store (juce::jlimit (-4, 4, octaves)); applyPitch();
+}
+
+void CircatThoughtProcessor::setPitchSemitone (int semitones) noexcept
+{
+    pitchSemitone.store (juce::jlimit (-12, 12, semitones)); applyPitch();
+}
+
+void CircatThoughtProcessor::setPitchFineCents (float cents) noexcept
+{
+    pitchFineCents.store (juce::jlimit (-100.0f, 100.0f, cents)); applyPitch();
 }
 
 void CircatThoughtProcessor::setLoop (int mode, float start, float end, float fadeSeconds) noexcept
@@ -131,6 +154,9 @@ void CircatThoughtProcessor::getStateInformation (juce::MemoryBlock& target)
     state.setProperty ("filterSustain", filterSustain.load(), nullptr);
     state.setProperty ("filterRelease", filterRelease.load(), nullptr);
     state.setProperty ("filterAmount", filterAmount.load(), nullptr);
+    state.setProperty ("pitchOctave", pitchOctave.load(), nullptr);
+    state.setProperty ("pitchSemitone", pitchSemitone.load(), nullptr);
+    state.setProperty ("pitchFineCents", pitchFineCents.load(), nullptr);
     if (auto xml = state.createXml()) copyXmlToBinary (*xml, target);
 }
 
@@ -159,6 +185,10 @@ void CircatThoughtProcessor::setStateInformation (const void* data, int size)
             setFilterEnvelope ((float) d ("filterAttack", 0.005), (float) d ("filterDecay", 0.20),
                                (float) d ("filterSustain", 0.0), (float) d ("filterRelease", 0.20),
                                (float) d ("filterAmount", 0.0));
+            pitchOctave.store (i ("pitchOctave", 0));
+            pitchSemitone.store (i ("pitchSemitone", 0));
+            pitchFineCents.store ((float) d ("pitchFineCents", 0.0));
+            applyPitch();
         }
 }
 

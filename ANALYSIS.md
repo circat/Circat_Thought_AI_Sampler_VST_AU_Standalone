@@ -37,8 +37,12 @@ Stand: 2026-09-04. Basis: `Source/`, `backend/`, `CMakeLists.txt`, `HANDOFF.md`.
 
 ### P3 – DSP-Qualität
 
-11. **Resampling linear interpoliert.** Bei Transposition nach oben (`increment > 1`) Aliasing. Für „S612-Charakter" evtl. gewollt (12-Bit-Ästhetik), aber dann bewusst dokumentieren; sonst Hermite/4-Punkt oder Mip-Sampling.
-12. **S612-Companding fehlt komplett.** PLAN/CircatThought.md beschreiben 12-Bit-Quantisierung + µ-law-Companding als Kern-Sound. Im Code: nichts davon. `WulfAD` (falls vorhanden) macht Input-Stage, aber die Bit-Crush/Sample-Rate-Reduktion des S612 ist nicht implementiert. Das ist das namensgebende Feature.
+> Richtung 2026-09-04: S612-Companding / Bit-Crush **nicht** gewünscht. S612 war
+> nur Arbeitsbasis. Circat Thought = moderner Sampler, einziges „vintage" Element
+> ist die WULF-Gain-Stufe. Punkt 12 entfällt.
+
+11. **Resampling linear interpoliert.** Bei Transposition nach oben (`increment > 1`) Aliasing. Für einen modernen Sampler: Hermite/4-Punkt-Interpolation oder Mip-Sampling einbauen.
+12. *(entfallen — S612-Companding nicht gewünscht)*
 13. **Filter ohne Oversampling.** Der neue TPT-SVF ist stabil, aber bei hohen Resonanzen + hohem Cutoff entsteht Aliasing. S612-Master oversampled den Filter 4×. Für Circat Thought optional 2× reichen.
 14. **Loop-Crossfade nur im Forward-Loop (`loopMode == 1`).** Ping-Pong (`loopMode == 2`) hat keinen Fade → Klick an den Wendepunkten.
 
@@ -69,9 +73,18 @@ Stand: 2026-09-04. Basis: `Source/`, `backend/`, `CMakeLists.txt`, `HANDOFF.md`.
 2. **Filter-Regressionstest** in `SamplerSmoke` – Sweep Cutoff 20 Hz…20 kHz, assert `isfinite` und Magnitude < 4.
 3. **Prompt-Redundanz entschärfen** + echtes `negative_conditioning` (P4-17/18).
 4. **Bridge-Shutdown im Plugin** (P2-6) – Orphan-Prozesse vermeiden.
-5. **Companding/Bit-Crush-Stufe** (P3-12) – das Kern-Feature laut Konzept. Klein: `round(x * 2^11) / 2^11` + optional Sample-Rate-Reduktion, hinter einem „S612 CRUNCH"-Regler.
+5. **Moderne Sampler-Features** statt S612-Emulation: Hermite-Interpolation (P3-11), Velocity→Filter/Amp-Mod, Round-Robin über die letzten N Generierungen, Sample-Reverse, Pitch-Bend-Range.
 6. **GitHub Actions** – configure + Smoke + pluginval.
 7. **Stable Audio Open small** als wählbares Backend-Modell (P4-15).
+
+## 5. Erledigt in Sitzung 2 (2026-09-04)
+
+- LOAD/UNLOAD-Buttons entfernt; Modell lädt automatisch beim ersten GENERATE (`LocalAiWorker::ensureModelReady`).
+- Waveform-Fenster zeigt animierten Lade-/Generierungs-Status bis neue Waveform vorliegt.
+- Jede Generierung wird als 24-bit WAV in `%LOCALAPPDATA%\CIRCAT\CircatThought\Generated\` abgelegt (Ringpuffer 60). Neuer `GeneratedBrowser`-Overlay: laden / exportieren / Ordner öffnen.
+- Logo-Klick → `circat::AboutPanel` (shared) + „SEND LOG" via `circat::Log`. Session-Header in `prepareToPlay`.
+- 7 fehlende Processor-Setter implementiert; volle State-Persistenz.
+- README: Speicherbedarf, Modellgröße, Referenz-Testsystem.
 
 ---
 

@@ -155,4 +155,7 @@ if __name__ == "__main__":
     instance_lock = acquire_single_instance_lock()
     if instance_lock is None:
         raise SystemExit(0)
+    # Warm the model straight away so the first GENERATE in the plugin does not
+    # have to wait for the full load; the plugin also triggers this over HTTP.
+    load_async()
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

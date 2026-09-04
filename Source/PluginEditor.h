@@ -1,7 +1,13 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "GeneratedBrowser.h"
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <memory>
+
+#if CIRCAT_HAS_ABOUT
+ #include <CircatAboutPanel.h>
+#endif
 
 /** Minimal horizontal level bar. Value is 0..1 already mapped to a dB scale. */
 class BarMeter final : public juce::Component
@@ -131,14 +137,16 @@ public:
     ~CircatThoughtEditor() override;
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
 
 private:
     void timerCallback() override;
+    void openBrowser();
     CircatThoughtLookAndFeel lookAndFeel;
     CircatThoughtProcessor& processor;
     juce::TextEditor prompt;
     juce::TextButton generate { "GENERATE" };
-    juce::TextButton loadModel { "LOAD MODEL" }, unloadModel { "UNLOAD" };
+    juce::TextButton browseSamples { "SAMPLE BROWSER" };
     juce::TextButton autoSlice { "AUTO SLICE" };
     juce::TextButton savePreset { "SAVE" }, loadPreset { "LOAD" };
     juce::TextButton saveSample { "EXPORT WAV" };
@@ -166,5 +174,11 @@ private:
     juce::Label attackLabel { {}, "A" }, decayLabel { {}, "D" }, sustainLabel { {}, "S" }, releaseLabel { {}, "R" }, driveLabel { {}, "WULF DRIVE" }, outputLabel { {}, "OUTPUT dB" };
     juce::Label filterLabel { {}, "FILTER" }, cutoffLabel { {}, "CUT" }, resonanceLabel { {}, "RES" }, filterAttackLabel { {}, "FA" }, filterDecayLabel { {}, "FD" }, filterSustainLabel { {}, "FS" }, filterReleaseLabel { {}, "FR" }, filterAmountLabel { {}, "ENV" };
     std::unique_ptr<juce::FileChooser> referenceChooser;
+    std::unique_ptr<GeneratedBrowser> browser;
+    juce::Rectangle<int> logoHit;
+    double animPhase = 0.0;
+#if CIRCAT_HAS_ABOUT
+    circat::AboutPanel about;
+#endif
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CircatThoughtEditor)
 };

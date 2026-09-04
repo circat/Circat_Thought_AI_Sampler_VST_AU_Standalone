@@ -39,7 +39,7 @@ cmake --build build --config Release --target CircatThoughtSamplerSmoke
 
 The bridge binds its port before model work and uses a Windows file lock (`stable_audio_bridge.lock`) so only one bridge instance can run. A second launcher must exit instead of creating another model process. The plugin communicates with `/health`, `/v1/model/load`, `/v1/model/unload`, and `/v1/generate.wav`.
 
-Model loading is explicit: the UI `LOAD MODEL` button starts asynchronous loading and `/health` reports `unloaded`, `loading`, `ready`, or `error`, including elapsed load time. `UNLOAD` moves the model off the device and releases cached GPU memory. Generation is rejected until the state is `ready`.
+Model loading is automatic: `LocalAiWorker` requests a load on startup and, on the first `GENERATE`, `ensureModelReady()` polls `/health` (`unloaded`, `loading`, `ready`, `error`) until the model is ready before sending the generate request. There is no user-facing load/unload button. `/v1/model/unload` still exists on the bridge for tooling.
 
 To start the service manually on Windows:
 

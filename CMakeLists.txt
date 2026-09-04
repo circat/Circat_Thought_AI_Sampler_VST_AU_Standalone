@@ -69,6 +69,18 @@ if(WIN32 AND EXISTS "D:/VSTPluginsDev/WULF-AD/Source/dsp/WulfAD.cpp")
     target_compile_definitions(${PROJECT_NAME} PRIVATE CIRCAT_HAS_WULF_INPUT=1)
 endif()
 
+# Shared Circat "About" tile + diagnostic log (identical in every Circat plugin).
+# Canonical source: d:/VSTPluginsDev/Releases/Shared/Circat
+set(CIRCAT_SHARED "D:/VSTPluginsDev/Releases/Shared/Circat")
+if(EXISTS "${CIRCAT_SHARED}/CircatAbout.cmake")
+    include("${CIRCAT_SHARED}/CircatAbout.cmake")
+    target_link_libraries(${PROJECT_NAME} PRIVATE CircatAboutData)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        "${CIRCAT_SHARED}"
+        "${CMAKE_BINARY_DIR}/juce_binarydata_CircatAboutData/JuceLibraryCode")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CIRCAT_HAS_ABOUT=1)
+endif()
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0

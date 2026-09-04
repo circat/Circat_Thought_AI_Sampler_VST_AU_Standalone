@@ -1,12 +1,33 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#if CIRCAT_HAS_ABOUT
+ #include <CircatLog.h>
+#endif
+
+namespace { const char* kPluginLogName = "Circat Thought"; const char* kPluginVersion = "v0.1.0"; }
+
+void circatLog (const juce::String& line)
+{
+#if CIRCAT_HAS_ABOUT
+    circat::Log::write (kPluginLogName, line);
+#else
+    juce::ignoreUnused (line);
+#endif
+}
+
 CircatThoughtProcessor::CircatThoughtProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)), sampler (16), worker (sampler)
 {
 }
 
-void CircatThoughtProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) { sampler.prepare (sampleRate, samplesPerBlock); }
+void CircatThoughtProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+{
+    sampler.prepare (sampleRate, samplesPerBlock);
+#if CIRCAT_HAS_ABOUT
+    circat::Log::beginSession (kPluginLogName, kPluginVersion, *this);
+#endif
+}
 void CircatThoughtProcessor::releaseResources() { sampler.reset(); }
 
 bool CircatThoughtProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const

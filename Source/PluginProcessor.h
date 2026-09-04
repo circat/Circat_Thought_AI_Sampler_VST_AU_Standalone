@@ -3,6 +3,10 @@
 #include "LocalAiWorker.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
+/** Appends one line to the shared Circat diagnostic log (no-op without CIRCAT_HAS_ABOUT).
+    Safe from any non-audio thread. */
+void circatLog (const juce::String& line);
+
 class CircatThoughtProcessor final : public juce::AudioProcessor
 {
 public:

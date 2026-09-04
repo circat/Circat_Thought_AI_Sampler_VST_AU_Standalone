@@ -2,9 +2,20 @@
 
 #include <cmath>
 
+void circatLog (const juce::String& line); // defined in PluginProcessor.cpp
+
+juce::File LocalAiWorker::generatedDirectory()
+{
+    auto dir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                   .getChildFile ("CIRCAT").getChildFile ("CircatThought").getChildFile ("Generated");
+    dir.createDirectory();
+    return dir;
+}
+
 LocalAiWorker::LocalAiWorker (ThoughtSampler& target) : juce::Thread ("Circat Thought AI"), sampler (target)
 {
     startLocalStack();
+    modelCommand.store (1); // auto-load: the user never presses a "load model" button
     startThread();
 }
 
@@ -114,11 +125,78 @@ void LocalAiWorker::run()
         }
 
         juce::String error;
-        const bool ok = generate (prompt, referencePath, duration, steps, cfg, seed, error);
+        circatLog ("generate request: \"" + prompt.substring (0, 120) + "\"");
+        {
+            const juce::ScopedLock lock (statusLock);
+            statusText = "Preparing Stable Audio Open…";
+        }
+        bool ok = ensureModelReady (error);
+        if (ok)
+        {
+            const juce::ScopedLock lock (statusLock);
+            statusText = "Generating locally…";
+        }
+        if (ok)
+            ok = generate (prompt, referencePath, duration, steps, cfg, seed, error);
         status.store (ok ? Status::ready : Status::error, std::memory_order_release);
-        const juce::ScopedLock lock (statusLock);
-        statusText = ok ? "Sample ready — play MIDI" : "AI error: " + error;
+        {
+            const juce::ScopedLock lock (statusLock);
+            statusText = ok ? "Sample ready — play MIDI" : "AI error: " + error;
+        }
+        circatLog (ok ? "generate ok" : "generate failed: " + error);
     }
+}
+
+bool LocalAiWorker::ensureModelReady (juce::String& error)
+{
+    for (int attempt = 0; attempt < 240 && ! threadShouldExit(); ++attempt)
+    {
+        int httpStatus = 0;
+        auto options = juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+            .withConnectionTimeoutMs (2000).withStatusCode (&httpStatus);
+        auto stream = std::unique_ptr<juce::InputStream> (
+            juce::URL ("http://127.0.0.1:8585/health").createInputStream (options));
+        if (stream != nullptr && httpStatus == 200)
+        {
+            juce::MemoryBlock response;
+            stream->readIntoMemoryBlock (response, 64 * 1024);
+            const auto parsed = juce::JSON::parse (response.toString());
+            if (auto* object = parsed.getDynamicObject())
+            {
+                const auto state = object->getProperty ("status").toString();
+                if ((bool) object->getProperty ("model_ready") || state == "ready")
+                    return true;
+                if (state == "error")
+                {
+                    error = object->getProperty ("error").toString();
+                    if (error.isEmpty()) error = "model load error";
+                    return false;
+                }
+                if (state == "unloaded" && attempt == 0)
+                    postModelCommand ("/v1/model/load");
+                const juce::ScopedLock lock (statusLock);
+                statusText = state == "loading" ? "Loading Stable Audio Open…" : "Waiting for model…";
+            }
+        }
+        wait (1000);
+    }
+    error = "model did not become ready — is backend/start_stable_audio.bat running?";
+    return false;
+}
+
+void LocalAiWorker::pruneGenerated()
+{
+    auto files = generatedDirectory().findChildFiles (juce::File::findFiles, false, "*.wav");
+    if (files.size() <= 60) return;
+    files.sort(); // name is timestamped, so lexical == chronological
+    for (int i = 0; i < files.size() - 60; ++i)
+        files.getReference (i).deleteFile();
+}
+
+juce::File LocalAiWorker::getLastGeneratedFile() const
+{
+    const juce::ScopedLock lock (statusLock);
+    return lastGenerated;
 }
 
 void LocalAiWorker::postModelCommand (const juce::String& path)
@@ -203,7 +281,28 @@ bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& re
     juce::AudioBuffer<float> audio ((int) juce::jmin ((unsigned int) 2, reader->numChannels), (int) reader->lengthInSamples);
     if (! reader->read (&audio, 0, audio.getNumSamples(), 0, true, true)) { error = "WAV decode failed"; return false; }
     trimToEvent (audio, reader->sampleRate);
-    sampler.setSampleData (std::make_shared<ThoughtSampleData> (audio, reader->sampleRate, 60));
+    const double outRate = reader->sampleRate;
+    sampler.setSampleData (std::make_shared<ThoughtSampleData> (audio, outRate, 60));
+
+    // Keep every generation on disk until the user exports it: the sample
+    // browser recalls them and nothing is lost on plugin close.
+    auto file = generatedDirectory().getChildFile (
+        "thought_" + juce::Time::getCurrentTime().formatted ("%Y%m%d_%H%M%S")
+        + "_" + juce::String (juce::Random::getSystemRandom().nextInt (9000) + 1000) + ".wav");
+    if (auto out = std::unique_ptr<juce::FileOutputStream> (file.createOutputStream()))
+    {
+        juce::WavAudioFormat wav;
+        if (auto* writer = wav.createWriterFor (out.get(), outRate,
+                                                (unsigned int) audio.getNumChannels(), 24, {}, 0))
+        {
+            out.release();
+            writer->writeFromAudioSampleBuffer (audio, 0, audio.getNumSamples());
+            delete writer;
+            const juce::ScopedLock lock (statusLock);
+            lastGenerated = file;
+        }
+    }
+    pruneGenerated();
     return true;
 }
 

@@ -11,18 +11,48 @@ Open weights are downloaded separately and remain subject to the Stability AI
 Community License; see [MODEL_LICENSES.md](MODEL_LICENSES.md) and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Windows / NVIDIA CUDA installation
+## System requirements
 
-Requirements: Windows 10/11 x64, current NVIDIA CUDA driver (24 GB VRAM recommended), Git, [`uv`](https://docs.astral.sh/uv/), and 20–30 GB free disk space. No Administrator rights are needed.
+| | |
+| --- | --- |
+| OS | Windows 10/11 x64 (64-bit) |
+| GPU | NVIDIA with current CUDA driver, **8 GB VRAM minimum**, 12 GB+ recommended. CPU fallback works but is very slow. |
+| CPU / RAM | any modern x64 CPU, 16 GB system RAM |
+| Disk — during install | **~25–30 GB free.** CUDA PyTorch wheels ~5–7 GB, pip/uv download cache ~3–5 GB, model weights ~9 GB, virtualenv ~2 GB. |
+| Disk — steady state | **~13–16 GB.** `%LOCALAPPDATA%\Circat\CircatThought\StableAudioOpen\.venv` ~8–10 GB + Hugging Face model cache ~9 GB (`%USERPROFILE%\.cache\huggingface`), minus the freed download caches. |
+| Tools | Git, [`uv`](https://docs.astral.sh/uv/). No Administrator rights needed. |
+
+### Model
+
+Stable Audio Open 1.0 (`stabilityai/stable-audio-open-1.0`): DiT audio-diffusion
+model (~1.2 B parameters) plus a T5 text encoder. Total download ≈ **9 GB**
+(`model.safetensors` ≈ 4.9 GB, T5 encoder ≈ 3.5 GB, configs). Weights are pulled
+into the standard Hugging Face cache and are **not** bundled with this repo.
+
+Inference uses ≈ 6–8 GB VRAM at fp16. A one-shot at the default 14 pingpong
+steps + fp16 generates in a few seconds on a recent 24 GB NVIDIA card; the first
+generation after the bridge starts is slower (kernel warm-up).
+
+### Reference test system
+
+Verified on: Windows 11 x64, NVIDIA GeForce RTX 3090 (24 GB), CUDA 12.x driver,
+Python 3.11, 64 GB RAM. Standalone + VST3 built with Visual Studio 2022 / CMake,
+JUCE 7.0.9.
+
+## Windows / NVIDIA CUDA installation
 
 1. Accept the license for [`stabilityai/stable-audio-open-1.0`](https://huggingface.co/stabilityai/stable-audio-open-1.0) and create a Hugging Face read token.
 2. Run `install_circat_thought.bat` from this repository.
-3. Enter the token when asked. The installer creates `%LOCALAPPDATA%\Circat\CircatThought\StableAudioOpen\.venv`, installs CUDA PyTorch and Stable Audio Open, and logs in to Hugging Face locally.
-4. Run `backend\start_stable_audio.bat`, launch the Standalone/plugin, then press **LOAD MODEL**.
+3. Enter the token when asked. The installer creates `%LOCALAPPDATA%\Circat\CircatThought\StableAudioOpen\.venv`, installs CUDA PyTorch and Stable Audio Open, and logs in to Hugging Face locally. The token is handed straight to `hf auth login`; it is never written to this repository or to any tracked file.
+4. Run `backend\start_stable_audio.bat`, then launch the Standalone/plugin.
 
-The model is not loaded automatically. The UI shows loading time and provides **UNLOAD MODEL** to release VRAM. Only one bridge uses port 8585.
+The bridge loads the model on its own the first time you press **GENERATE** —
+there is no separate load step. Only one bridge uses port 8585.
 
 If `uv` is missing: `winget install --id Astral-sh.uv --exact`.
+
+Faster, higher-quality generation (optional): set `CIRCAT_COMPILE=1` before
+starting the bridge to enable `torch.compile` (slower first run, faster after).
 
 ## macOS (Apple Silicon / CPU)
 
@@ -34,7 +64,8 @@ Use Python 3.11 and `uv`; install platform-appropriate PyTorch, `stable-audio-to
 | --- | --- |
 | Bridge connection failed | Run `backend\start_stable_audio.bat` and wait for health status. |
 | 401/403 during model load | Accept the model license and repeat `hf auth login`. |
-| CUDA out of memory | Press **UNLOAD MODEL**, close GPU applications, or use CPU/MPS. |
+| CUDA out of memory | Close other GPU applications, or run the bridge on CPU/MPS. |
+| First generation hangs for a minute | Expected — the model loads on first GENERATE and CUDA kernels warm up. |
 
 ## Developer build
 

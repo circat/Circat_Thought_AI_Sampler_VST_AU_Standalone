@@ -17,9 +17,13 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
         processor.generate (prompt.getText(), (float) aiDuration.getValue(), (int) aiSteps.getValue(), (float) aiCfg.getValue(), (int) aiSeed.getValue());
     };
     addAndMakeVisible (generate);
-    loadModel.onClick = [this] { processor.loadAiModel(); };
-    unloadModel.onClick = [this] { processor.unloadAiModel(); };
-    addAndMakeVisible (loadModel); addAndMakeVisible (unloadModel);
+    browseSamples.onClick = [this] { openBrowser(); };
+    addAndMakeVisible (browseSamples);
+#if CIRCAT_HAS_ABOUT
+    about.setPluginInfo ("CIRCAT THOUGHT", "v0.1.0");
+    about.setLogName ("Circat Thought");
+    about.attachTo (*this);
+#endif
     status.setJustificationType (juce::Justification::centredLeft);
     status.setColour (juce::Label::textColourId, juce::Colour (0xff9ed6b4));
     addAndMakeVisible (status);
@@ -180,7 +184,8 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
     juce::ColourGradient velvet (ct::velvetTop, 0.0f, 44.0f, ct::velvetBot, 0.0f, bounds.getBottom(), false);
     g.setGradientFill (velvet); g.fillRect (bounds);
     g.setColour (ct::accent); g.fillRect (0.0f, 43.0f, bounds.getWidth(), 1.0f);
-    g.setColour (ct::textPrimary);
+    logoHit = { 16, 6, 320, 34 };
+    g.setColour (isMouseOverOrDragging() && logoHit.contains (getMouseXYRelative()) ? ct::accent : ct::textPrimary);
     g.setFont (juce::Font (20.0f, juce::Font::bold));
     g.drawText ("CIRCAT THOUGHT", 24, 10, 310, 28, juce::Justification::centredLeft);
     g.setColour (ct::textLabel); g.setFont (12.0f);
@@ -202,7 +207,34 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colour (0xff10090c)); g.fillRoundedRectangle (wave.toFloat(), 4.0f);
     g.setColour (juce::Colour (0x33d9a557));
     for (int y = wave.getY() + 16; y < wave.getBottom(); y += 12) g.drawHorizontalLine (y, (float) wave.getX(), (float) wave.getRight());
-    if (const auto* sample = processor.getSampleForDisplay())
+    const bool busy = processor.getGenerationStatus() == LocalAiWorker::Status::generating;
+    if (busy)
+    {
+        // Animated placeholder while the model loads / renders, until a new
+        // waveform is swapped in on the worker thread.
+        juce::Path scan;
+        const float cy = (float) wave.getCentreY();
+        for (int x = 0; x < wave.getWidth(); ++x)
+        {
+            const float t = (float) x / (float) wave.getWidth();
+            const float env = std::sin (t * juce::MathConstants<float>::pi);
+            const float wob = std::sin (t * 34.0f - (float) animPhase * 3.0f)
+                            * std::sin (t * 7.0f + (float) animPhase);
+            const float y = cy + wob * env * (float) wave.getHeight() * 0.34f;
+            if (x == 0) scan.startNewSubPath ((float) wave.getX(), y);
+            else        scan.lineTo ((float) (wave.getX() + x), y);
+        }
+        g.setColour (ct::accent.withAlpha (0.85f));
+        g.strokePath (scan, juce::PathStrokeType (1.5f));
+        const int barW = (int) (wave.getWidth() * juce::jlimit (0.04, 1.0, generationProgress));
+        g.setColour (ct::accent.withAlpha (0.25f));
+        g.fillRect (wave.getX(), wave.getBottom() - 4, barW, 4);
+        g.setColour (ct::textLabel);
+        g.setFont (12.0f);
+        g.drawText (processor.getGenerationStatusText().toUpperCase(),
+                    wave.withTrimmedBottom (10), juce::Justification::centred, false);
+    }
+    else if (const auto* sample = processor.getSampleForDisplay())
     {
         const auto& audio = sample->audio;
         g.setColour (juce::Colour (0xffd9a557));
@@ -219,6 +251,37 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
     else { g.setColour (juce::Colour (0xff858f96)); g.drawFittedText ("GENERATE A SAMPLE", wave, juce::Justification::centred, 1); }
 }
 
+void CircatThoughtEditor::mouseDown (const juce::MouseEvent& e)
+{
+#if CIRCAT_HAS_ABOUT
+    if (logoHit.contains (e.getPosition()))
+        about.show();
+#else
+    juce::ignoreUnused (e);
+#endif
+}
+
+void CircatThoughtEditor::openBrowser()
+{
+    if (browser != nullptr) { browser.reset(); return; }
+    browser = std::make_unique<GeneratedBrowser> (LocalAiWorker::generatedDirectory());
+    browser->onClose = [this] { browser.reset(); };
+    browser->onLoad = [this] (juce::File f)
+    {
+        juce::String error;
+        if (processor.loadSampleFile (f, error))
+        {
+            start.setValue (processor.getSampleStart(), juce::dontSendNotification);
+            end.setValue (processor.getSampleEnd(), juce::dontSendNotification);
+            browser.reset();
+        }
+        else
+            status.setText (error, juce::dontSendNotification);
+    };
+    addAndMakeVisible (*browser);
+    browser->setBounds (getLocalBounds());
+}
+
 void CircatThoughtEditor::resized()
 {
     const int top = 60, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;
@@ -232,8 +295,7 @@ void CircatThoughtEditor::resized()
     aiParam (durationLabel, aiDuration); aiParam (stepsLabel, aiSteps); aiParam (cfgLabel, aiCfg); aiParam (seedLabel, aiSeed);
     generationParameters.setBounds (ai.removeFromTop (42));
     referenceStatus.setBounds (ai.removeFromTop (22)); ai.removeFromTop (5);
-    loadModel.setBounds (ai.removeFromTop (28).removeFromLeft (110));
-    unloadModel.setBounds (ai.removeFromTop (28).removeFromLeft (90));
+    browseSamples.setBounds (ai.removeFromTop (28).removeFromLeft (140));
     ai.removeFromTop (8);
     generate.setBounds (ai.removeFromBottom (36).removeFromRight (120)); ai.removeFromBottom (8);
     prompt.setBounds (ai);
@@ -272,6 +334,11 @@ void CircatThoughtEditor::resized()
     filterArea.removeFromTop (4);
     placeFilterKnob (filterAttackLabel, filterAttack); placeFilterKnob (filterDecayLabel, filterDecay); placeFilterKnob (filterSustainLabel, filterSustain); placeFilterKnob (filterReleaseLabel, filterRelease);
     filterArea.removeFromTop (4); placeFilterKnob (filterAmountLabel, filterAmount);
+
+    if (browser != nullptr) browser->setBounds (getLocalBounds());
+#if CIRCAT_HAS_ABOUT
+    about.setBounds (getLocalBounds());
+#endif
 }
 
 void CircatThoughtEditor::timerCallback()
@@ -295,6 +362,7 @@ void CircatThoughtEditor::timerCallback()
     const double meterTarget = juce::jlimit (0.0, 1.0, (peakDb + 60.0) / 66.0);
     outputMeter = juce::jmax (meterTarget, outputMeter - 0.06); // ~0.5 s fall at 30 Hz
     outputMeterBar.setValue (outputMeter);
+    animPhase += 0.16;
     // Newly generated sample data is swapped on the worker thread. Repaint the
     // display on the message thread so the waveform visibly confirms the load.
     repaint();

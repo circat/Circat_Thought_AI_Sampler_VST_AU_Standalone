@@ -198,7 +198,10 @@ void LocalAiWorker::pruneGenerated()
     if (files.size() <= 60) return;
     files.sort(); // name is timestamped, so lexical == chronological
     for (int i = 0; i < files.size() - 60; ++i)
+    {
         files.getReference (i).deleteFile();
+        files.getReference (i).withFileExtension ("txt").deleteFile();
+    }
 }
 
 juce::File LocalAiWorker::getLastGeneratedFile() const
@@ -311,6 +314,20 @@ bool LocalAiWorker::generate (const juce::String& prompt, const juce::String& re
             lastGenerated = file;
         }
     }
+
+    // Write sidecar prompt text file.
+    auto textFile = file.withFileExtension ("txt");
+    if (auto textOut = std::unique_ptr<juce::FileOutputStream> (textFile.createOutputStream()))
+    {
+        juce::StringArray lines;
+        lines.add (prompt);
+        lines.add ("duration: " + juce::String (duration, 2));
+        lines.add ("steps: " + juce::String (steps));
+        lines.add ("cfg: " + juce::String (cfg, 2));
+        lines.add ("seed: " + juce::String (seed));
+        textOut->writeText (lines.joinIntoString ("\n"), false, false, "\n");
+    }
+
     pruneGenerated();
     return true;
 }

@@ -84,4 +84,9 @@ private:
 #if CIRCAT_HAS_WULF_INPUT
     wulf::WulfAD inputStage[2];
 #endif
+
+    // Master bus filter state (TPT SVF, applied after voice render + WULF drive, before output gain).
+    float m_svfIc1[2]{}, m_svfIc2[2]{};
+    float m_fEnv = 0.0f;
+    int m_fStage = 0;
 };

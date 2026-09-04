@@ -132,7 +132,6 @@ private:
     juce::TextButton saveSample { "EXPORT WAV" };
     juce::TextButton reference { "REFERENCE AUDIO" };
     juce::Label status;
-    juce::Label generationParameters;
     juce::Label commandView;
     double generationProgress = 0.0;
     juce::ProgressBar generationProgressBar { generationProgress };

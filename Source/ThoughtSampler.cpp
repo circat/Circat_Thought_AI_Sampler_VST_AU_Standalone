@@ -36,15 +36,6 @@ public:
             decayStep = (1.0f - sustain) / juce::jmax (1.0f, decay * (float) outputRate);
             releaseStep = juce::jmax (sustain, 0.001f) / juce::jmax (1.0f, release * (float) outputRate);
             envelope = 0.0f; sustainLevel = sustain; stage = 0;
-            filterMode = newFilterMode;
-            filterCutoff = newCutoff;
-            filterResonance = newResonance;
-            filterAttackStep = 1.0f / juce::jmax (1.0f, filterAttack * (float) outputRate);
-            filterDecayStep = (1.0f - filterSustain) / juce::jmax (1.0f, filterDecay * (float) outputRate);
-            filterReleaseStep = juce::jmax (filterSustain, 0.001f) / juce::jmax (1.0f, filterRelease * (float) outputRate);
-            filterEnvelope = 0.0f; filterSustainLevel = filterSustain; filterStage = 0;
-            filterAmount = filterEnvAmount; filterSampleRate = outputRate;
-            svfIc1[0] = svfIc1[1] = svfIc2[0] = svfIc2[1] = 0.0f;
             loopMode = newLoopMode;
             loopStartPosition = lastIndex * juce::jlimit (regionStart, regionEnd - 0.001f, newLoopStart);
             const float minimumLoopEnd = (float) (loopStartPosition / lastIndex) + 0.001f;
@@ -60,7 +51,6 @@ public:
         if (active && (midiNote < 0 || note == midiNote))
         {
             stage = 3;
-            filterStage = 3;
         }
     }
 
@@ -113,19 +103,6 @@ public:
             if (stage == 0) { envelope += attackStep; if (envelope >= 1.0f) { envelope = 1.0f; stage = 1; } }
             else if (stage == 1) { envelope -= decayStep; if (envelope <= sustainLevel) { envelope = sustainLevel; stage = 2; } }
             else if (stage == 3) { envelope -= releaseStep; if (envelope <= 0.0f) { active = false; break; } }
-            if (filterStage == 0) { filterEnvelope += filterAttackStep; if (filterEnvelope >= 1.0f) { filterEnvelope = 1.0f; filterStage = 1; } }
-            else if (filterStage == 1) { filterEnvelope -= filterDecayStep; if (filterEnvelope <= filterSustainLevel) { filterEnvelope = filterSustainLevel; filterStage = 2; } }
-            else if (filterStage == 3) { filterEnvelope -= filterReleaseStep; if (filterEnvelope < 0.0f) filterEnvelope = 0.0f; }
-            // TPT / zero-delay-feedback state-variable filter (Zavalishin). Unconditionally
-            // stable across the whole cutoff range, unlike the previous Chamberlin SVF which
-            // blew up above ~fs/6 (default 8 kHz cutoff => silent output on load).
-            const float cutoffHz = juce::jlimit (20.0f, (float) filterSampleRate * 0.45f,
-                                                 filterCutoff * std::pow (2.0f, filterEnvelope * filterAmount));
-            const float g = std::tan (juce::MathConstants<float>::pi * cutoffHz / (float) filterSampleRate);
-            const float k = 2.0f - 1.9f * juce::jlimit (0.0f, 1.0f, filterResonance); // 2.0 (clean) .. 0.1 (resonant)
-            const float a1 = 1.0f / (1.0f + g * (g + k));
-            const float a2 = g * a1;
-            const float a3 = g * a2;
             for (int channel = 0; channel < outputChannels; ++channel)
             {
                 const int sourceChannel = std::min (channel, sourceChannels - 1);
@@ -149,21 +126,6 @@ public:
                     const float blend = (float) ((position - (loopEndPosition - loopFadeSamples)) / loopFadeSamples);
                     value = value + (loopValue - value) * juce::jlimit (0.0f, 1.0f, blend);
                 }
-                if (filterMode != 0)
-                {
-                    const int sc = juce::jmin (channel, 1);
-                    const float v3 = value - svfIc2[sc];
-                    const float v1 = a1 * svfIc1[sc] + a2 * v3;
-                    const float v2 = svfIc2[sc] + a2 * svfIc1[sc] + a3 * v3;
-                    svfIc1[sc] = 2.0f * v1 - svfIc1[sc];
-                    svfIc2[sc] = 2.0f * v2 - svfIc2[sc];
-                    const float low = v2;
-                    const float band = v1;
-                    const float high = value - k * v1 - v2;
-                    value = filterMode == 1 ? low : (filterMode == 2 ? high : band);
-                    if (! std::isfinite (value)) { svfIc1[sc] = svfIc2[sc] = 0.0f; value = 0.0f; }
-                    value = juce::jlimit (-4.0f, 4.0f, value);
-                }
                 output.addSample (channel, start + i, value * gain * envelope);
             }
             position += increment * direction;
@@ -177,12 +139,8 @@ private:
     int loopFadeSamples = 0;
     float gain = 0.0f;
     float envelope = 0.0f, attackStep = 1.0f, decayStep = 0.0f, releaseStep = 1.0f, sustainLevel = 1.0f;
-    float svfIc1[2] {}, svfIc2[2] {};
-    float filterCutoff = 8000.0f, filterResonance = 0.12f, filterAmount = 0.0f;
-    float filterEnvelope = 0.0f, filterAttackStep = 1.0f, filterDecayStep = 0.0f, filterReleaseStep = 1.0f, filterSustainLevel = 0.0f;
-    double filterSampleRate = 44100.0;
     int note = -1;
-    int stage = 0, filterStage = 0, filterMode = 0, loopMode = 0;
+    int stage = 0, loopMode = 0;
     bool active = false;
 };
 
@@ -281,6 +239,10 @@ void ThoughtSampler::processBlock (juce::AudioBuffer<float>& output, const juce:
         const auto message = metadata.getMessage();
         if (message.isNoteOn())
         {
+            // Retrigger master filter envelope on note-on.
+            m_fStage = 0;
+            m_fEnv = 0.0f;
+
             Voice* selected = nullptr;
             for (auto& voice : voices)
                 if (! voice->isActive()) { selected = voice.get(); break; }
@@ -295,13 +257,16 @@ void ThoughtSampler::processBlock (juce::AudioBuffer<float>& output, const juce:
             }
             selected->noteOn (message.getNoteNumber(), message.getFloatVelocity(), getSample(), sampleRate, getPitchTuning(),
                               getRegionStart(), getRegionEnd(), ampAttack.load(), ampDecay.load(), ampSustain.load(), ampRelease.load(),
-                              filterMode.load(), filterCutoff.load(), filterResonance.load(), filterAttack.load(), filterDecay.load(),
-                              filterSustain.load(), filterRelease.load(), filterAmount.load(), loopMode.load(), loopStart.load(),
+                              0, 8000.0f, 0.12f, 0.005f, 0.20f, 0.0f, 0.20f, 0.0f, loopMode.load(), loopStart.load(),
                               loopEnd.load(), loopFadeSeconds.load());
         }
         else if (message.isNoteOff())
+        {
+            // Set master filter to release stage on any note-off.
+            m_fStage = 3;
             for (auto& voice : voices)
                 voice->noteOff (message.getNoteNumber());
+        }
         cursor = eventSample;
     }
     if (cursor < output.getNumSamples())
@@ -317,6 +282,65 @@ void ThoughtSampler::processBlock (juce::AudioBuffer<float>& output, const juce:
                 output.setSample (channel, sample, inputStage[juce::jmin (channel, 1)].processSample (output.getSample (channel, sample)));
         }
 #endif
+    // Master bus filter (TPT SVF). Apply after voice render + WULF drive, before output gain.
+    const int masterFilterMode = filterMode.load (std::memory_order_relaxed);
+    if (masterFilterMode != 0)
+    {
+        const float masterFilterCutoff = filterCutoff.load (std::memory_order_relaxed);
+        const float masterFilterResonance = filterResonance.load (std::memory_order_relaxed);
+        const float masterFilterAttack = filterAttack.load (std::memory_order_relaxed);
+        const float masterFilterDecay = filterDecay.load (std::memory_order_relaxed);
+        const float masterFilterSustain = filterSustain.load (std::memory_order_relaxed);
+        const float masterFilterRelease = filterRelease.load (std::memory_order_relaxed);
+        const float masterFilterAmount = filterAmount.load (std::memory_order_relaxed);
+
+        // Advance filter envelope per sample.
+        const float fAttackStep = 1.0f / juce::jmax (1.0f, masterFilterAttack * (float) sampleRate);
+        const float fDecayStep = (1.0f - masterFilterSustain) / juce::jmax (1.0f, masterFilterDecay * (float) sampleRate);
+        const float fReleaseStep = juce::jmax (masterFilterSustain, 0.001f) / juce::jmax (1.0f, masterFilterRelease * (float) sampleRate);
+
+        for (int sample = 0; sample < output.getNumSamples(); ++sample)
+        {
+            // Advance filter envelope.
+            if (m_fStage == 0) { m_fEnv += fAttackStep; if (m_fEnv >= 1.0f) { m_fEnv = 1.0f; m_fStage = 1; } }
+            else if (m_fStage == 1) { m_fEnv -= fDecayStep; if (m_fEnv <= masterFilterSustain) { m_fEnv = masterFilterSustain; m_fStage = 2; } }
+            else if (m_fStage == 3) { m_fEnv -= fReleaseStep; if (m_fEnv <= 0.0f) m_fEnv = 0.0f; }
+
+            // Compute cutoff from envelope.
+            const float cutoffHz = juce::jlimit (20.0f, (float) sampleRate * 0.45f,
+                                                 masterFilterCutoff * std::pow (2.0f, m_fEnv * masterFilterAmount));
+
+            // TPT SVF coefficients.
+            const float g = std::tan (juce::MathConstants<float>::pi * cutoffHz / (float) sampleRate);
+            const float k = 2.0f - 1.9f * juce::jlimit (0.0f, 1.0f, masterFilterResonance);
+            const float a1 = 1.0f / (1.0f + g * (g + k));
+            const float a2 = g * a1;
+            const float a3 = g * a2;
+
+            // Apply filter to each channel.
+            for (int channel = 0; channel < output.getNumChannels(); ++channel)
+            {
+                const int sc = juce::jmin (channel, 1);
+                const float value = output.getSample (channel, sample);
+                const float v3 = value - m_svfIc2[sc];
+                const float v1 = a1 * m_svfIc1[sc] + a2 * v3;
+                const float v2 = m_svfIc2[sc] + a2 * m_svfIc1[sc] + a3 * v3;
+                m_svfIc1[sc] = 2.0f * v1 - m_svfIc1[sc];
+                m_svfIc2[sc] = 2.0f * v2 - m_svfIc2[sc];
+
+                const float low = v2;
+                const float band = v1;
+                const float high = value - k * v1 - v2;
+                float filtered = masterFilterMode == 1 ? low : (masterFilterMode == 2 ? high : band);
+
+                // Non-finite guard.
+                if (! std::isfinite (filtered)) { m_svfIc1[sc] = m_svfIc2[sc] = 0.0f; filtered = 0.0f; }
+                filtered = juce::jlimit (-4.0f, 4.0f, filtered);
+
+                output.setSample (channel, sample, filtered);
+            }
+        }
+    }
     const float outputGain = std::pow (10.0f, outputGainDb.load (std::memory_order_relaxed) / 20.0f);
     float peak = 0.0f;
     for (int channel = 0; channel < output.getNumChannels(); ++channel)

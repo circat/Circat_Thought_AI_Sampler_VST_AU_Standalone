@@ -102,15 +102,6 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     aiSeed.setRange (-1, 2147483646.0, 1); aiSeed.setSkewFactorFromMidPoint (1000.0);
     aiSeed.setValue (processor.getAiSeed(), juce::dontSendNotification);
     for (auto* label : { &durationLabel, &stepsLabel, &cfgLabel, &seedLabel }) { label->setColour (juce::Label::textColourId, juce::Colour (0xff858f96)); addAndMakeVisible (*label); }
-    generationParameters.setText (
-        "QUALITY: FAST 14 steps pingpong  ·  BALANCED 40  ·  QUALITY 110 steps dpmpp-3m-sde\n"
-        "Auto-slice keeps the strongest hit, max 2.5 s.\n"
-        "Negative conditioning removes drums / rhythm / melody / vocals / reverb — no need to type it.",
-        juce::dontSendNotification);
-    generationParameters.setJustificationType (juce::Justification::centredLeft);
-    generationParameters.setColour (juce::Label::textColourId, juce::Colour (0xff858f96));
-    generationParameters.setFont (juce::Font (13.0f));
-    addAndMakeVisible (generationParameters);
     referenceStatus.setText ("ONE-SHOT MODE · use PROMPT BUILDER or type freely", juce::dontSendNotification);
     referenceStatus.setColour (juce::Label::textColourId, juce::Colour (0xffd7b76d));
     addAndMakeVisible (referenceStatus);
@@ -449,17 +440,22 @@ void CircatThoughtEditor::openBrowser()
         else
             status.setText (error, juce::dontSendNotification);
     };
+    browser->onLoadPrompt = [this] (juce::String p) { prompt.setText (p, false); };
     addAndMakeVisible (*browser);
     browser->setBounds (getLocalBounds());
 }
 
 void CircatThoughtEditor::openMixer()
 {
-    if (mixer != nullptr) { mixer.reset(); return; }
-    mixer = std::make_unique<PromptMixer>();
-    mixer->onClose = [this] { mixer.reset(); };
-    mixer->onUsePrompt = [this] (juce::String p) { prompt.setText (p, false); };
-    addAndMakeVisible (*mixer);
+    if (mixer == nullptr)
+    {
+        mixer = std::make_unique<PromptMixer>();
+        mixer->onClose = [this] { mixer->setVisible (false); };
+        mixer->onUsePrompt = [this] (juce::String p) { prompt.setText (p, false); };
+        addAndMakeVisible (*mixer);
+    }
+    mixer->setVisible (true);
+    mixer->toFront (true);
     mixer->setBounds (getLocalBounds());
 }
 
@@ -475,7 +471,6 @@ void CircatThoughtEditor::resized()
     auto aiParam = [&ai] (juce::Label& label, juce::Slider& slider)
     { label.setBounds (ai.removeFromTop (20).removeFromLeft (52)); slider.setBounds (ai.removeFromTop (20)); };
     aiParam (durationLabel, aiDuration); aiParam (stepsLabel, aiSteps); aiParam (cfgLabel, aiCfg); aiParam (seedLabel, aiSeed);
-    generationParameters.setBounds (ai.removeFromTop (42));
     referenceStatus.setBounds (ai.removeFromTop (22)); ai.removeFromTop (5);
     browseSamples.setBounds (ai.removeFromTop (28).removeFromLeft (140));
     ai.removeFromTop (8);

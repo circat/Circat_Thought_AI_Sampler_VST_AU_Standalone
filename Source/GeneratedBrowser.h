@@ -20,6 +20,7 @@ public:
     std::function<void ()> onStopPreview;
     std::function<void (float)> onPreviewGainDb;  // preview level changed
     std::function<bool ()> isPreviewPlaying;
+    std::function<void (juce::String)> onLoadPrompt;  // prompt text from sidecar
 
     explicit GeneratedBrowser (juce::File directory, float initialGainDb = -6.0f)
         : dir (std::move (directory))
@@ -165,7 +166,18 @@ private:
         if (juce::isPositiveAndBelow (row, files.size()) && onLoad)
         {
             stopPreview();
-            onLoad (files.getReference (row));
+            const auto wavFile = files.getReference (row);
+            onLoad (wavFile);
+
+            // Try to load and deliver the prompt from sidecar .txt file.
+            const auto textFile = wavFile.withFileExtension ("txt");
+            if (textFile.existsAsFile() && onLoadPrompt)
+            {
+                const auto content = textFile.loadFileAsString();
+                const auto firstLine = content.upToFirstOccurrenceOf ("\n", false, false).trim();
+                if (firstLine.isNotEmpty())
+                    onLoadPrompt (firstLine);
+            }
         }
     }
 

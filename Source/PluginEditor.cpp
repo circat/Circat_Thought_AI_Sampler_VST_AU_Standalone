@@ -81,16 +81,6 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     commandView.setFont (juce::Font (11.0f)); addAndMakeVisible (commandView);
     generationProgressBar.setColour (juce::ProgressBar::foregroundColourId, juce::Colour (0xffd9a557));
     generationProgressBar.setColour (juce::ProgressBar::backgroundColourId, juce::Colour (0xff17191d)); addAndMakeVisible (generationProgressBar);
-    for (int i = 0; i < numPromptTemplates; ++i)
-        promptPreset.addItem (promptTemplates[i].name, i + 1);
-    promptPreset.setSelectedId (1);
-    promptPreset.onChange = [this]
-    {
-        const int index = promptPreset.getSelectedId() - 1;
-        if (index > 0 && index < numPromptTemplates)
-            prompt.setText (promptTemplates[index].text, false);
-    };
-    addAndMakeVisible (promptPreset);
     qualityMode.addItem ("FAST", 1); qualityMode.addItem ("BALANCED", 2); qualityMode.addItem ("QUALITY", 3);
     qualityMode.onChange = [this]
     {
@@ -121,7 +111,7 @@ CircatThoughtEditor::CircatThoughtEditor (CircatThoughtProcessor& p) : AudioProc
     generationParameters.setColour (juce::Label::textColourId, juce::Colour (0xff858f96));
     generationParameters.setFont (juce::Font (13.0f));
     addAndMakeVisible (generationParameters);
-    referenceStatus.setText ("ONE-SHOT MODE · Prompt templates: NOTE / CHORD / STAB / TEXTURE", juce::dontSendNotification);
+    referenceStatus.setText ("ONE-SHOT MODE · use PROMPT BUILDER or type freely", juce::dontSendNotification);
     referenceStatus.setColour (juce::Label::textColourId, juce::Colour (0xffd7b76d));
     addAndMakeVisible (referenceStatus);
     autoSlice.onClick = [this] { processor.autoSlice(); start.setValue (processor.getSampleStart()); end.setValue (processor.getSampleEnd()); };
@@ -468,11 +458,7 @@ void CircatThoughtEditor::openMixer()
     if (mixer != nullptr) { mixer.reset(); return; }
     mixer = std::make_unique<PromptMixer>();
     mixer->onClose = [this] { mixer.reset(); };
-    mixer->onUsePrompt = [this] (juce::String p)
-    {
-        prompt.setText (p, false);
-        promptPreset.setSelectedId (1, juce::dontSendNotification);
-    };
+    mixer->onUsePrompt = [this] (juce::String p) { prompt.setText (p, false); };
     addAndMakeVisible (*mixer);
     mixer->setBounds (getLocalBounds());
 }
@@ -484,8 +470,7 @@ void CircatThoughtEditor::resized()
     status.setBounds (ai.removeFromTop (22));
     commandView.setBounds (ai.removeFromTop (22));
     generationProgressBar.setBounds (ai.removeFromTop (8)); ai.removeFromTop (5);
-    promptPreset.setBounds (ai.removeFromTop (24)); ai.removeFromTop (4);
-    promptBuilder.setBounds (ai.removeFromTop (24)); ai.removeFromTop (4);
+    promptBuilder.setBounds (ai.removeFromTop (26)); ai.removeFromTop (6);
     { auto r = ai.removeFromTop (24); qualityLabel.setBounds (r.removeFromLeft (62)); qualityMode.setBounds (r); ai.removeFromTop (4); }
     auto aiParam = [&ai] (juce::Label& label, juce::Slider& slider)
     { label.setBounds (ai.removeFromTop (20).removeFromLeft (52)); slider.setBounds (ai.removeFromTop (20)); };

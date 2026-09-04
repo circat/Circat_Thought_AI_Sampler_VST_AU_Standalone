@@ -108,34 +108,6 @@ public:
     }
 };
 
-struct PromptTemplate { const char* name; const char* text; };
-
-// One-shot oriented starting points. The bridge appends its own negative tags
-// (no drums / no rhythm / dry / no reverb), so these stay focused on timbre.
-static constexpr PromptTemplate promptTemplates[] =
-{
-    { "CUSTOM PROMPT",   "" },
-    { "SINGLE NOTE",     "single sustained analog synth note, D minor, warm, dry studio, mono" },
-    { "MINOR CHORD",     "single sustained chord, D minor triad, static harmony, dry studio" },
-    { "MAJOR CHORD",     "single sustained chord, C major triad, static harmony, dry studio" },
-    { "CHORD STAB",      "sharp chord stab, brass section, A minor, tight transient, dry studio" },
-    { "DARK PAD",        "dark evolving pad chord, low analog strings, C minor, slow attack, dry" },
-    { "GLASS BELL",      "soft glass bell tone, single strike, long decay, clean, dry studio" },
-    { "MALLET",          "wooden mallet marimba note, single hit, short decay, dry close mic" },
-    { "PLUCK",           "plucked nylon string note, single note, medium decay, dry studio" },
-    { "BRASS SECTION",   "warm brass section sustained chord, F major, cinematic, dry studio" },
-    { "STRINGS",         "lush string ensemble sustained chord, A minor, bowed, dry studio" },
-    { "CHOIR",           "choral voices sustained vowel chord, E minor, aah, dry studio" },
-    { "SUB BASS",        "deep sine sub bass note, single low note, clean, dry studio, mono" },
-    { "ORGAN",           "vintage tonewheel organ sustained chord, G major, dry studio" },
-    { "DRONE",           "static harmonic drone, single evolving cluster, no rhythm, dry" },
-    { "TEXTURE",         "isolated tonal texture, granular shimmer, static, dry studio" },
-    { "8-BIT",           "8-bit chiptune square-wave chord, C minor, single sustained stab, dry" },
-    { "NOISE SWEEP",     "filtered white noise swell, single gesture, no pitch, dry studio" },
-    { "FX HIT",          "cinematic impact hit, metallic, single transient, short tail, dry" },
-};
-static constexpr int numPromptTemplates = (int) (sizeof (promptTemplates) / sizeof (promptTemplates[0]));
-
 class CircatThoughtEditor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
@@ -165,7 +137,6 @@ private:
     double generationProgress = 0.0;
     juce::ProgressBar generationProgressBar { generationProgress };
     juce::int64 generationStartedMs = 0;
-    juce::ComboBox promptPreset;
     juce::ComboBox qualityMode;
     juce::Label qualityLabel { {}, "QUALITY" };
     juce::Slider aiDuration, aiSteps, aiCfg, aiSeed;

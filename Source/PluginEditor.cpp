@@ -278,7 +278,8 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
     g.setColour (ct::textDim);
     g.setFont (juce::Font (11.0f).withExtraKerningFactor (0.10f));
     g.drawText ("AI SAMPLER  //  STABLE AUDIO OPEN",
-                { panel.getX(), panel.getY() + 52, panel.getWidth(), 14 }, juce::Justification::centred, false);
+                juce::Rectangle<int> (panel.getX(), panel.getY() + 52, panel.getWidth(), 14),
+                juce::Justification::centred, false);
 
     // ── logo in the bottom-right corner (opens the About tile)
     logoHit = { getWidth() - 176, getHeight() - 36, 158, 28 };
@@ -288,7 +289,8 @@ void CircatThoughtEditor::paint (juce::Graphics& g)
                                 juce::RectanglePlacement::centred, 1.0f);
     g.setColour (isMouseOverOrDragging() && logoHit.contains (getMouseXYRelative()) ? ct::accent : ct::textDim);
     g.setFont (juce::Font (10.0f).withExtraKerningFactor (0.1f));
-    g.drawText ("CIRCAT // MEDIA", { getWidth() - 176, getHeight() - 34, 104, 20 }, juce::Justification::centredRight, false);
+    g.drawText ("CIRCAT // MEDIA", juce::Rectangle<int> (getWidth() - 176, getHeight() - 34, 104, 20),
+                juce::Justification::centredRight, false);
 #endif
 
     const int top = 84, left = 24, gutter = 16, width = (getWidth() - left * 2 - gutter * 3) / 4;

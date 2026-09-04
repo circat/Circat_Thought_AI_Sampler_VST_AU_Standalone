@@ -287,7 +287,7 @@ private:
         return parts.joinIntoString (", ");
     }
 
-    void rebuildPreview() { preview.setText (assemble(), juce::dontSendNotification); }
+    void rebuildPreview() { preview.setText (assemble(), false); }
 
     // ── data ───────────────────────────────────────────────────────────────
     static constexpr SoundType kTypes[] =
@@ -316,7 +316,7 @@ private:
     juce::TextEditor search;
     juce::ListBox list;
     juce::OwnedArray<juce::ToggleButton> charChips;
-    juce::Label preview;
+    juce::TextEditor preview;
     juce::TextButton useBtn, closeBtn;
     juce::Array<int> filtered;
     int selectedInstrument = -1;
